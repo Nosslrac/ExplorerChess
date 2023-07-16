@@ -55,7 +55,10 @@ template<bool whiteToMove, bool castling>
 void Engine::doMove(Position& pos, uint32_t move) {
     //Incrementally update position
     const uint64_t fromTo = getFromTo(move);
-
+    pos.teamBoards[0] ^= fromTo;
+    pos.teamBoards[2 - whiteToMove] ^= fromTo;
+    pos.teamBoards[2 - !whiteToMove] &= ~(1ULL << (move & 0x3F));
+    pos.whiteToMove = !pos.whiteToMove;
 
 
     //Save state info
@@ -63,9 +66,9 @@ void Engine::doMove(Position& pos, uint32_t move) {
     //Update state info
     constexpr int back = whiteToMove ? 8 : -8;
     pos.st.enPassant = (back + (move & 0x3F)) * (move == DOUBLE_PUSH);
-
-
-
+    MoveGen::pinnedBoard(pos);
+    MoveGen::checks(pos);
+    
 
 }
 
