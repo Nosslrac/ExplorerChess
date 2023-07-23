@@ -6,7 +6,7 @@
 
 namespace GUI{
 	//Fen representation
-	constexpr char fenRepresentation[10] = { 'P', 'N', 'B', 'R', 'Q', 'p', 'n', 'b', 'r', 'q' };
+	constexpr char fenRepresentation[12] = { 'K', 'P', 'N', 'B', 'R', 'Q', 'k', 'p', 'n', 'b', 'r', 'q' };
 	constexpr char fenCastle[4] = { 'K', 'Q', 'k', 'q' };
 	constexpr char fenMove[2] = { 'w', 'b' };
 
@@ -30,6 +30,12 @@ namespace GUI{
 	* @param pBoard array to store fen representation of the pieces
 	*/
 	void fillPieceArray(Position& pos, char pBoard[]);
+
+	void parseMove(uint32_t move);
+
+	void printMove(uint32_t move);
+
+	void printState(StateInfo& st);
 }
 
 

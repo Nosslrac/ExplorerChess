@@ -6,14 +6,21 @@
 #define bitCount(b) __popcnt64(b)
 #define bitScan(i, BB) _BitScanForward64(i, BB)
 
+#define getTo(move) (move & 0xFF)
+#define getFrom(move) ((move >> 8) & 0xFF)
+#define getFlags(move) (move & 0xFF0000)
+#define getMover(move) ((move >> 24) & 0xF)
+#define getCaptured(move) (move >> 28)
+
+
 
 enum Piece {
+	King,
 	Pawn, 
 	Knight,
 	Bishop,
 	Rook,
 	Queen,
-	King
 };
 
 enum Direction {
@@ -25,19 +32,19 @@ enum Direction {
 
 enum MoveFlags {
 	NO_FLAG = 0,
-	DOUBLE_PUSH = 0x1000,
-	CASTLE_KING = 0x2000,
-	CASTLE_QUEEN = 0x3000,
-	CAPTURE = 0x4000,
-	EP_CAPTURE = 0x5000,
-	PROMO_N = 0x8000,
-	PROMO_B = 0x9000,
-	PROMO_R = 0xA000,
-	PROMO_Q = 0xB000,
-	PROMO_NC = 0xC000,
-	PROMO_BC = 0xD000,
-	PROMO_RC = 0xE000,
-	PROMO_QC = 0xF000
+	DOUBLE_PUSH = 0x10000,
+	CASTLE_KING = 0x20000,
+	CASTLE_QUEEN = 0x30000,
+	CAPTURE = 0x40000,
+	EP_CAPTURE = 0x50000,
+	PROMO_N = 0x80000,
+	PROMO_B = 0x90000,
+	PROMO_R = 0xA0000,
+	PROMO_Q = 0xB0000,
+	PROMO_NC = 0xC0000,
+	PROMO_BC = 0xD0000,
+	PROMO_RC = 0xE0000,
+	PROMO_QC = 0xF0000
 };
 
 constexpr uint64_t FileA = 0x0101010101010101ULL;
@@ -59,7 +66,7 @@ constexpr uint64_t Rank7 = Rank1 << (8 * 6);
 constexpr uint64_t Rank8 = Rank1 << (8 * 7);
 
 
-constexpr uint8_t NoEP = 0x10;
+constexpr uint8_t NoEP = 0;
 constexpr uint64_t All_SQ = ~0ULL;
 
 //TODO: implement 50 move rule
@@ -76,23 +83,30 @@ struct StateInfo {
 //Inherits irreversible info from StateInfo 
 struct Position {
 	StateInfo st;
-	uint8_t kings[2];
-	uint64_t pieceBoards[10];
+	uint64_t pieceBoards[12];
 	uint64_t teamBoards[3];
 
 	bool whiteToMove;
+
+	bool operator ==(const Position& pos) {
+		return memcmp(this, &pos, sizeof(Position)) == 0;
+	}
 };
 
 struct MoveList {
 	uint32_t moves[100] = {};
-	uint32_t* curr = moves;
+	uint8_t curr = 0;
 	inline void add(uint32_t move){
-		*curr++ = move;
+		moves[curr++] = move;
+	}
+	inline uint8_t size() {
+		return curr;
 	}
 };
 
 
-
+template<bool white>
+const inline uint8_t getPiece(const uint64_t pieces[], uint8_t sq);
 
 
 template<bool whiteToMove, Direction D>
@@ -110,8 +124,8 @@ constexpr uint64_t shift(uint64_t b) {
 //Return possible ep capturers
 template<bool whiteToMove>
 constexpr inline uint64_t EPpawns(const Position& pos) {
-	if constexpr (whiteToMove) return Rank4 & pos.pieceBoards[0];
-	return Rank5 & pos.pieceBoards[5];
+	if constexpr (whiteToMove) return Rank4 & pos.pieceBoards[1];
+	return Rank5 & pos.pieceBoards[7];
 }
 
 constexpr inline uint64_t getFromTo(uint32_t move) {
@@ -121,6 +135,8 @@ constexpr inline uint64_t getFromTo(uint32_t move) {
 constexpr inline bool moreThanOne(uint64_t b) {
 	return b & (b - 1);
 }
+
+
 
 
 

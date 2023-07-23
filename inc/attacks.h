@@ -18,7 +18,7 @@ namespace magicalBits
             std::function<uint64_t(uint8_t)> attackFunction,
             std::function<uint64_t(uint8_t, uint64_t)> attacksWithBlockFunction);
         void initMagicNumbers();
-        // private:
+private:
         
         static uint64_t maskBishopAttacks(uint8_t position);
         static uint64_t maskRookAttacks(uint8_t position);

@@ -8,7 +8,13 @@ class MoveGen : private magicalBits::MagicalBitboards{
 public:
 	MoveGen();
 	template<bool whiteToMove>
-	const void generateAllMoves(const Position& pos, MoveList& move_list) const;
+	const bool generateAllMoves(const Position& pos, MoveList& move_list) const;
+
+	template<bool whiteToMove, bool castling, bool pins, bool enPassant>
+	const void generateMoves(const Position& pos, MoveList& move_list) const;
+
+	template<bool whiteToMove, bool castling>
+	const void generateKingMoves(const Position& pos, MoveList& move_list) const;
 
 	template<bool whiteToMove, bool pins, bool enPassent>
 	const void generatePawnMoves(const Position& pos, MoveList& move_list) const;
@@ -33,22 +39,36 @@ public:
 	const void pinnedBoard(Position& pos);
 	template<bool whiteToMove>
 	const void checks(Position& pos);
+	template<bool whiteToMove>
+	const void findAttack(Position& pos);
 
 private:
+
+	template<Piece p>
+	const uint64_t pieceAttack(uint64_t board, uint64_t pieces) const;
+	template<Piece p>
+	const uint64_t stepAttack(uint64_t pieces) const;
 
 	const inline uint64_t bishopAttack(uint64_t board, uint8_t square) const;
 	const inline uint64_t rookAttack(uint64_t board, uint8_t square) const;
 
 	template<bool isPromotion>
-	const inline void constructMove(MoveList& move_list, uint8_t from, uint8_t to, MoveFlags flag) const;
+	const inline void constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPiece) const;
 
 	template<bool whiteToMove, bool enPassent>
 	const void pinnedPawns(const Position& pos, MoveList& move_list, uint64_t pinned) const;
 	
 	template<bool pin, bool isPromotion>
-	const void makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, uint8_t back, MoveFlags flag) const;
+	const void makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPiece) const;
+
+	template<bool whiteToMove, bool pin, bool isPromotion>
+	const inline void makePawnCapture(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const;
 	
-	const inline void makePieceMove(MoveList& move_list, uint64_t toSQs, uint8_t back, MoveFlags flag) const;
+	const inline void makePieceMove(MoveList& move_list, uint64_t toSQs, uint8_t back, uint32_t flagAndPiece) const;
+
+	template<bool whiteToMove>
+	const inline void makeCaptureMove(const uint64_t pieceBoards[], MoveList& move_list, uint64_t toSQs, uint8_t back, uint32_t flagAndPiece) const;
+
 
 	//------------------Helper lookups------------------------------
 
@@ -66,18 +86,30 @@ private:
 	template<bool whiteToMove>
 	constexpr inline uint64_t moveableSquares(const Position& pos) const
 	{
-		if constexpr (whiteToMove) return ~pos.teamBoards[2];
-		return ~pos.teamBoards[1];
+		if constexpr (whiteToMove) return ~pos.teamBoards[1];
+		return ~pos.teamBoards[2];
+	}
+
+	template<bool white>
+	constexpr inline uint64_t getStraigthSliders(const Position& pos) const{
+		if constexpr (white) {
+			return pos.pieceBoards[4] | pos.pieceBoards[5];
+		}
+		else {
+			return pos.pieceBoards[10] | pos.pieceBoards[11];
+		}
 	}
 
 
-	//DO NOT USE FOR KING
 	template<bool white, Piece p>
 	constexpr inline uint64_t getPieces(const Position& pos) const {
 		if constexpr (white) {
 			return pos.pieceBoards[p];
 		}
-		return pos.pieceBoards[p + 5];
+		else {
+			return pos.pieceBoards[p + 6];
+		}
+		
 	}
 
 
