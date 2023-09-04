@@ -20,7 +20,7 @@ namespace GUI {
 	}
 
 	//Prints the pices in a given position
-	void print_pieces(Position& pos) {
+	void print_pieces(const Position& pos) {
 		char pBoard[64];
 		fillPieceArray(pos, pBoard);
 		std::string stb = "";
@@ -41,9 +41,9 @@ namespace GUI {
 	}
 
 	//Initiates a piece array for display in cmd
-	void fillPieceArray(Position& pos, char pBoard[]) {
+	void fillPieceArray(const Position& pos, char pBoard[]) {
 		std::fill_n(pBoard, 64, '-');
-		for (int i = 0; i < 12; i++) {
+		for (int i = 0; i < 10; i++) {
 			uint64_t pieces = pos.pieceBoards[i];
 			unsigned long sq;
 			while (pieces) {
@@ -52,12 +52,15 @@ namespace GUI {
 				pieces &= pieces - 1;
 			}
 		}
+		pBoard[pos.kings[0]] = 'K';
+		pBoard[pos.kings[1]] = 'k';
+
 	}
 
 
 
 	//Returns the fen for the current position
-	void getPositionFen(Position& pos) {
+	void getPositionFen(const Position& pos) {
 		char pBoard[64];
 		fillPieceArray(pos, pBoard);
 
@@ -101,6 +104,7 @@ namespace GUI {
 		char to = getTo(move);
 		MoveFlags flags = (MoveFlags)getFlags(move);
 		char mover = getMover(move);
+
 		char capped = getCaptured(move);
 		std::string fString;
 		switch (flags)
@@ -109,7 +113,8 @@ namespace GUI {
 		case NO_FLAG: fString = "NO_FLAG"; break;
 		case EP_CAPTURE: fString = "EP_CAPTURE"; break;
 		case DOUBLE_PUSH: fString = "DOUBLE_PUSH"; break;
-
+		case CASTLE_KING: fString = "CASTLE_KING"; break;
+		case CASTLE_QUEEN: fString = "CASTLE_QUEEN"; break;
 		default: fString = "PROMO";
 			break;
 		}
@@ -131,6 +136,19 @@ namespace GUI {
 		char buff[150];
 		sprintf_s(buff, "Block: %llu, Pinned: %llu, Attack %llu, Checkers: %d, Castle: %d, Enpassant: %d", st.blockForKing, st.pinnedMask, st.enemyAttack, st.numCheckers, st.castlingRights, st.enPassant);
 		std::cout << buff << std::endl;
+	}
+
+	uint32_t findMove(MoveList& ml, std::string move) {
+		int from = (move.at(0) - 'a') + (8 - move.at(1) + '0') * 8;
+		int to = (move.at(2) - 'a') + (8 - move.at(3) + '0') * 8;
+
+		for (int i = 0; i < ml.size(); ++i) {
+			const uint32_t curr = ml.moves[i];
+			if (getFrom(curr) == from && getTo(curr) == to) {
+				return curr;
+			}
+		}
+		return 0;
 	}
 }
 

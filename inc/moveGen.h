@@ -58,6 +58,11 @@ private:
 	template<bool whiteToMove, bool enPassent>
 	const void pinnedPawns(const Position& pos, MoveList& move_list, uint64_t pinned) const;
 	
+
+	template<bool whiteToMove, bool pins>
+	const void enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP) const;
+
+
 	template<bool pin, bool isPromotion>
 	const void makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPiece) const;
 
@@ -107,7 +112,7 @@ private:
 			return pos.pieceBoards[p];
 		}
 		else {
-			return pos.pieceBoards[p + 6];
+			return pos.pieceBoards[p + 5];
 		}
 		
 	}

@@ -11,16 +11,19 @@
 #define getFlags(move) (move & 0xFF0000)
 #define getMover(move) ((move >> 24) & 0xF)
 #define getCaptured(move) (move >> 28)
+#define getPromo(move) ((move >> 16) & 0x3)
+#define BB(i) (1ULL << i)
+
 
 
 
 enum Piece {
-	King,
-	Pawn, 
-	Knight,
-	Bishop,
-	Rook,
-	Queen,
+	King = 10,
+	Pawn = 0, 
+	Knight = 1,
+	Bishop = 2,
+	Rook = 3,
+	Queen = 4,
 };
 
 enum Direction {
@@ -69,6 +72,20 @@ constexpr uint64_t Rank8 = Rank1 << (8 * 7);
 constexpr uint8_t NoEP = 0;
 constexpr uint64_t All_SQ = ~0ULL;
 
+//---------CASTLING SQUARES--------------------------
+
+constexpr uint64_t WHITE_QUEEN_PIECES = BB(59) | BB(58) | BB(57);
+constexpr uint64_t WHITE_KING_PIECES = BB(61) | BB(62);
+constexpr uint64_t BLACK_QUEEN_PIECES = BB(1) | BB(2) | BB(3);
+constexpr uint64_t BLACK_KING_PIECES = BB(6) | BB(5);
+
+//Attacked squares differ from occupied on queenside
+constexpr uint64_t WHITE_ATTACK_QUEEN = WHITE_QUEEN_PIECES ^ BB(59) ^ BB(60);
+constexpr uint64_t BLACK_ATTACK_QUEEN = BLACK_QUEEN_PIECES ^ BB(1) ^ BB(4);
+constexpr uint64_t WHITE_ATTACK_KING = WHITE_KING_PIECES ^ BB(60);
+constexpr uint64_t BLACK_ATTACK_KING = BLACK_KING_PIECES ^ BB(4);
+
+
 //TODO: implement 50 move rule
 struct StateInfo {
 	uint64_t blockForKing;
@@ -83,7 +100,8 @@ struct StateInfo {
 //Inherits irreversible info from StateInfo 
 struct Position {
 	StateInfo st;
-	uint64_t pieceBoards[12];
+	uint8_t kings[2];
+	uint64_t pieceBoards[10];
 	uint64_t teamBoards[3];
 
 	bool whiteToMove;
@@ -121,6 +139,28 @@ constexpr uint64_t shift(uint64_t b) {
 	}
 }
 
+template<bool white, bool kingSide>
+constexpr bool isOccupied(uint64_t board) {
+	if constexpr (white) {
+		return kingSide ? WHITE_KING_PIECES & board : WHITE_QUEEN_PIECES & board;
+	}
+	else {
+		return kingSide ? BLACK_KING_PIECES & board : BLACK_QUEEN_PIECES & board;
+	}
+}
+
+
+template<bool white, bool kingSide>
+constexpr bool isAttacked(uint64_t attack) {
+	if constexpr (white) {
+		return kingSide ? WHITE_KING_PIECES & attack : WHITE_ATTACK_QUEEN & attack;
+	}
+	else {
+		return kingSide ? BLACK_KING_PIECES & attack : BLACK_ATTACK_QUEEN & attack;
+	}
+}
+
+
 //Return possible ep capturers
 template<bool whiteToMove>
 constexpr inline uint64_t EPpawns(const Position& pos) {
@@ -128,9 +168,6 @@ constexpr inline uint64_t EPpawns(const Position& pos) {
 	return Rank5 & pos.pieceBoards[7];
 }
 
-constexpr inline uint64_t getFromTo(uint32_t move) {
-	return 1ULL << (move & 0x3F) | 1ULL << ((move >> 6) & 0x3F);
-}
 
 constexpr inline bool moreThanOne(uint64_t b) {
 	return b & (b - 1);

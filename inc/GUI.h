@@ -6,7 +6,7 @@
 
 namespace GUI{
 	//Fen representation
-	constexpr char fenRepresentation[12] = { 'K', 'P', 'N', 'B', 'R', 'Q', 'k', 'p', 'n', 'b', 'r', 'q' };
+	constexpr char fenRepresentation[10] = {'P', 'N', 'B', 'R', 'Q', 'p', 'n', 'b', 'r', 'q' };
 	constexpr char fenCastle[4] = { 'K', 'Q', 'k', 'q' };
 	constexpr char fenMove[2] = { 'w', 'b' };
 
@@ -20,22 +20,24 @@ namespace GUI{
 	/** Prints board with pieces as their fen representation
 	* @param square position info
 	*/
-	void print_pieces(Position& pos);
+	void print_pieces(const Position& pos);
 	/** Prints the fen for the position
 	* @param square position info
 	*/
-	void getPositionFen(Position& pos);
+	void getPositionFen(const Position& pos);
 	/** Helper function to printpieces
 	* @param square position info
 	* @param pBoard array to store fen representation of the pieces
 	*/
-	void fillPieceArray(Position& pos, char pBoard[]);
+	void fillPieceArray(const Position& pos, char pBoard[]);
 
 	void parseMove(uint32_t move);
 
 	void printMove(uint32_t move);
 
 	void printState(StateInfo& st);
+
+	uint32_t findMove(MoveList& ml, std::string move);
 }
 
 

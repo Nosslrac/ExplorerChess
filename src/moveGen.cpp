@@ -51,19 +51,35 @@ const bool MoveGen::generateAllMoves(const Position& pos, MoveList& move_list) c
 
 template<bool whiteToMove, bool castling>
 const void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list) const {
-	if constexpr (castling) {
-		//Make castling moves
-	}
+	//CHANGE KING, he is not a bitboard any more
+	constexpr uint32_t mover = King << 24;
 
-	constexpr uint32_t ID = whiteToMove ? 0 : 6; /////KING NEEDS A CAPTURE ID OTHERWISE WE FUCK UP WHITE PAWNS AND SHIT
-	constexpr uint32_t pID = ID << 24;
-	unsigned long king;
-	bitScan(&king, pos.pieceBoards[ID]);
+	if constexpr (castling) {
+		const uint64_t board = pos.teamBoards[0];
+		const uint64_t attack = pos.st.enemyAttack;
+		if constexpr (whiteToMove) {
+			const bool kingSide = !(board & WHITE_KING_PIECES) && !(attack & WHITE_ATTACK_KING) && (pos.st.castlingRights & 0b0001);
+			const bool queenSide = !(board & WHITE_QUEEN_PIECES) && !(attack & WHITE_ATTACK_QUEEN) && (pos.st.castlingRights & 0b0010);
+			move_list.moves[move_list.curr] = (uint32_t)(62 | (60 << 8) | CASTLE_KING | mover) * kingSide;
+			move_list.curr += kingSide;
+			move_list.moves[move_list.curr] = (uint32_t)(58 | (60 << 8) | CASTLE_QUEEN | mover) * queenSide;
+			move_list.curr += queenSide;
+		}
+		else {
+			const bool kingSide = !(board & BLACK_KING_PIECES) && !(attack & BLACK_ATTACK_KING) && (pos.st.castlingRights & 0b0100);
+			const bool queenSide = !(board & BLACK_QUEEN_PIECES) && !(attack & BLACK_ATTACK_QUEEN) && (pos.st.castlingRights & 0b1000);
+			move_list.moves[move_list.curr] = (uint32_t)(6 | (4 << 8) | CASTLE_KING | mover) * kingSide;
+			move_list.curr += kingSide;
+			move_list.moves[move_list.curr] = (uint32_t)(2 | (4 << 8) | CASTLE_QUEEN | mover) * queenSide;
+			move_list.curr += queenSide;
+		}
+	}
+	const uint8_t king = pos.kings[!whiteToMove];
 	const uint64_t moves = kingLookUp[king] & moveableSquares<whiteToMove>(pos) & ~pos.st.enemyAttack;
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
 
-	makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, king, CAPTURE | pID);
-	makePieceMove(move_list, moves & ~enemy, king, NO_FLAG | pID);
+	makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, king, CAPTURE | mover);
+	makePieceMove(move_list, moves & ~enemy, king, NO_FLAG | mover);
 
 	
 }
@@ -77,7 +93,7 @@ const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list) 
 	constexpr uint64_t promoRank = whiteToMove ? Rank2 : Rank7;
 	constexpr uint64_t doublePotential = whiteToMove ? Rank6 : Rank3;
 	constexpr int8_t back = whiteToMove ? 8 : -8;
-	constexpr uint32_t pID = whiteToMove ? 1 << 24: 7 << 24;
+	constexpr uint32_t pID = whiteToMove ? 0 << 24: 5 << 24;
 
 
 
@@ -119,68 +135,27 @@ const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list) 
 	}
 
 	if constexpr (enPassant) {
-		constexpr uint64_t EPrank = whiteToMove ? Rank4 : Rank5;
-		unsigned long king;
-		bitScan(&king, pos.pieceBoards[6 - 6 * whiteToMove]);
-		const uint8_t EP = pos.st.enPassant;
-		uint64_t capturers = pawnAttackBB<!whiteToMove>(1ULL << EP) & pawns;
-		//Handle pinned ep cappers differently
-		unsigned long fromSQ;
-
-		//Case when slider and king are on ep rank
-		if ((1ULL << king) & EPrank) {
-			uint64_t attackers = getStraigthSliders<!whiteToMove>(pos) & EPrank;
-			unsigned long attacker;
-			while (attackers) {
-				bitScan(&attacker, attackers);
-				const uint64_t pieces = betweenBB(king, attacker) & pos.teamBoards[0];
-				//If there is excactly two pieces between and one of them is the capturing pawn then ep is illegal
-				if (bitCount(pieces) == 2 && (capturers & pieces)) {
-					return;
-				}
-			}
-		}
-
-		if constexpr (pins) {
-			uint64_t pinned = capturers & pos.st.pinnedMask;
-			capturers &= ~pinned;
-			while (pinned) {
-				bitScan(&fromSQ, capturers);
-				pinned &= pinned - 1;
-				if ((1ULL << fromSQ) & LineBB[fromSQ][king]) {
-					constructMove<false>(move_list, fromSQ, EP, EP_CAPTURE | pID);
-				}
-			}
-		}
-
-		while (capturers) {
-			bitScan(&fromSQ, capturers);
-			capturers &= capturers - 1;
-			constructMove<false>(move_list, fromSQ, EP, EP_CAPTURE | pID);
-
-		}
+		enPassantMoves<whiteToMove, pins>(pos, move_list, pos.st.enPassant);
 	}
 }
 
 
 template<bool whiteToMove, Piece p, bool pins>
 const void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list) const {
-	constexpr uint32_t pID = whiteToMove ? p << 24 : (p + 6) << 24;
+	constexpr uint32_t pID = whiteToMove ? p << 24 : (p + 5) << 24;
 	uint64_t bishops = getPieces<whiteToMove, p>(pos);
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
 	const uint64_t nonTeam = moveableSquares<whiteToMove>(pos);
+	const uint64_t block = pos.st.blockForKing;
 	
 	unsigned long b;
 	while (bishops) {
 		bitScan(&b, bishops);
 		bishops &= bishops - 1;
-		uint64_t moves = attackBB<p>(pos.teamBoards[0], b) & nonTeam & pos.st.blockForKing;
+		uint64_t moves = attackBB<p>(pos.teamBoards[0], b) & nonTeam & block;
 		if constexpr (pins) {
 			if ((1ULL << b) & pos.st.pinnedMask) {
-				constexpr uint8_t kingID = whiteToMove ? 0 : 6;
-				unsigned long king;
-				bitScan(&king, pos.pieceBoards[kingID]);
-				moves &= LineBB[b][king];
+				moves &= LineBB[b][pos.kings[!whiteToMove]];
 			}
 		}
 		makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, b, CAPTURE | pID);
@@ -190,7 +165,7 @@ const void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list)
 
 template<bool whiteToMove, bool pins>
 const void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list) const {
-	constexpr uint32_t pID = whiteToMove ? Knight << 24 : Knight + 6 << 24;
+	constexpr uint32_t pID = whiteToMove ? Knight << 24 : Knight + 5 << 24;
 	uint64_t knights = getPieces<whiteToMove, Knight>(pos);
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
 	const uint64_t nonTeam = moveableSquares<whiteToMove>(pos);
@@ -211,6 +186,46 @@ const void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list
 
 //-----------------------Movemaking helper methods-----------------------------------------------------
 
+
+template<bool whiteToMove, bool pins>
+const void MoveGen::enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP) const{
+	//TODO: check on rank still allows EP, veri bad
+	constexpr uint32_t pID = whiteToMove ? 0 << 24 : 5 << 24;
+	constexpr uint64_t EPrank = whiteToMove ? Rank4 : Rank5;
+	
+	const uint64_t realPawn = shift<whiteToMove, DOWN>(BB(EP));
+	const bool legalWhenCheck = pos.st.blockForKing & realPawn;
+	uint64_t capturers = pawnAttackBB<!whiteToMove>(BB(EP)) & getPieces<whiteToMove, Pawn>(pos);
+
+	//Special lateral pin case for en passant and check with double push
+	const uint64_t rankPin = EPrank & (getPieces<!whiteToMove, Rook>(pos) | getPieces<!whiteToMove, Queen>(pos));
+	const uint8_t king = pos.kings[!whiteToMove];
+	const bool kingSameRank = (BB(king) & EPrank) && (EPrank & rankPin);
+	
+	const uint64_t boardWithoutEP = (realPawn | capturers) ^ pos.teamBoards[0];
+
+	if (legalWhenCheck && !(kingSameRank && bitCount(capturers) == 1 && rookAttack(boardWithoutEP, king) & rankPin)) {
+		unsigned long fromSQ;
+		while (capturers) {
+			bitScan(&fromSQ, capturers);
+			capturers &= capturers - 1;
+			//Only add if the pawn isn't pinned or the move moves along the pin
+			if constexpr (pins) {
+				if ((BB(fromSQ) & pos.st.pinnedMask) == 0 || (BB(EP) & LineBB[fromSQ][king])) {
+					constructMove<false>(ml, fromSQ, EP, EP_CAPTURE | pID);
+				}
+			}
+			else {
+				constructMove<false>(ml, fromSQ, EP, EP_CAPTURE | pID);
+			}
+		}
+	}
+	
+}
+
+
+
+
 template<bool isPromotion>
 const inline void MoveGen::constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPieces) const{
 	move_list.add(to | (from << 8) | flagAndPieces);
@@ -229,10 +244,8 @@ const inline void MoveGen::makePawnMove(const Position& pos, MoveList& move_list
 		toSQs &= toSQs - 1;
 		if constexpr (pin) {
 			const uint8_t from = toSQ + back;
-			unsigned long king;
-			bitScan(&king, pos.pieceBoards[6 - 6 * pos.whiteToMove]);
 			//Only add if the pawn isn't pinned or the move moves along the pin
-			if (((1ULL << from) & pos.st.pinnedMask) == 0 || ((1ULL << toSQ) & LineBB[from][king])) {
+			if (((1ULL << from) & pos.st.pinnedMask) == 0 || ((1ULL << toSQ) & LineBB[from][pos.kings[!pos.whiteToMove]])) {
 				constructMove<isPromotion>(move_list, from, toSQ, flagAndPieces);
 			}
 
@@ -252,10 +265,8 @@ const inline void MoveGen::makePawnCapture(const Position& pos, MoveList& move_l
 		const uint32_t flagUpdate = flagAndPieces | (getPiece<!whiteToMove>(pos.pieceBoards, toSQ) << 28);
 		if constexpr (pin) {
 			const uint8_t from = toSQ + back;
-			unsigned long king;
-			bitScan(&king, pos.pieceBoards[6 - 6 * pos.whiteToMove]);
 			//Only add if the pawn isn't pinned or the move moves along the pin
-			if (((1ULL << from) & pos.st.pinnedMask) == 0 || ((1ULL << toSQ) & LineBB[from][king])) {
+			if (((1ULL << from) & pos.st.pinnedMask) == 0 || ((1ULL << toSQ) & LineBB[from][pos.kings[!pos.whiteToMove]])) {
 				constructMove<isPromotion>(move_list, from, toSQ, flagUpdate);
 			}
 
@@ -295,12 +306,11 @@ const inline void MoveGen::makeCaptureMove(const uint64_t pieceBoards[], MoveLis
 template<bool whiteToMove>
 const void MoveGen::checks(Position& pos){
 	uint64_t checkers = 0;
-	unsigned long king;
-	bitScan(&king, pos.pieceBoards[6 - 6 * whiteToMove]);
+	const uint8_t king = pos.kings[!whiteToMove];
 
 	//Opposite color knights
 	const uint64_t knightCheck = stepAttackBB<Knight>(king) & getPieces<!whiteToMove, Knight>(pos);
-	const uint64_t pawnCheck = pawnAttackBB<Pawn>(1ULL << king) & getPieces<!whiteToMove, Pawn>(pos);
+	const uint64_t pawnCheck = pawnAttackBB<whiteToMove>(1ULL << king) & getPieces<!whiteToMove, Pawn>(pos);
 
 	//Is either a knight or pawn, cannot be both so bool is no problem
 	pos.st.numCheckers += (const bool)(knightCheck | pawnCheck);
@@ -321,8 +331,7 @@ const void MoveGen::pinnedBoard(Position& pos){
 	uint64_t pinned = 0;
 	uint64_t blockForKing = 0;
 	uint8_t numCheckers = 0;
-	unsigned long king;
-	bitScan(&king, pos.pieceBoards[6 - 6 * whiteToMove]);
+	const uint8_t king = pos.kings[!whiteToMove];
 
 	uint64_t snipers = ((emptyAttack<Rook>(king) & (getPieces<!whiteToMove, Rook>(pos) | getPieces<!whiteToMove, Queen>(pos))) 
 					  | emptyAttack<Bishop>(king) & (getPieces<!whiteToMove, Bishop>(pos) | getPieces<!whiteToMove, Queen>(pos)));
@@ -359,24 +368,21 @@ const void MoveGen::pinnedBoard(Position& pos){
 template<bool whiteToMove>
 const void MoveGen::findAttack(Position& pos) {
 	uint64_t attack = 0;
-	unsigned long king;
 	if constexpr (whiteToMove) {
-		const uint64_t board_noKing = pos.teamBoards[0] ^ pos.pieceBoards[0];
-		bitScan(&king, pos.pieceBoards[6]);
-		attack |= pieceAttack<Bishop>(board_noKing, pos.pieceBoards[9] | pos.pieceBoards[11]);
-		attack |= pieceAttack<Rook>(board_noKing, pos.pieceBoards[10] | pos.pieceBoards[11]);
-		attack |= stepAttack<Knight>(pos.pieceBoards[8]);
-		attack |= kingLookUp[king];
-		attack |= shift<false, UP_LEFT>(pos.pieceBoards[7]) | shift<false, UP_RIGHT>(pos.pieceBoards[7]);
+		const uint64_t board_noKing = pos.teamBoards[0] ^ BB(pos.kings[0]);
+		attack |= pieceAttack<Bishop>(board_noKing, pos.pieceBoards[7] | pos.pieceBoards[9]);
+		attack |= pieceAttack<Rook>(board_noKing, pos.pieceBoards[8] | pos.pieceBoards[9]);
+		attack |= stepAttack<Knight>(pos.pieceBoards[6]);
+		attack |= kingLookUp[pos.kings[1]];
+		attack |= shift<false, UP_LEFT>(pos.pieceBoards[5]) | shift<false, UP_RIGHT>(pos.pieceBoards[5]);
 	}
 	else {
-		const uint64_t board_noKing = pos.teamBoards[0] ^ pos.pieceBoards[6];
-		bitScan(&king, pos.pieceBoards[0]);
-		attack |= pieceAttack<Bishop>(pos.teamBoards[0], pos.pieceBoards[3] | pos.pieceBoards[5]);
-		attack |= pieceAttack<Rook>(pos.teamBoards[0], pos.pieceBoards[4] | pos.pieceBoards[5]);
-		attack |= stepAttack<Knight>(pos.pieceBoards[2]);
-		attack |= kingLookUp[king];
-		attack |= shift<true, UP_LEFT>(pos.pieceBoards[1]) | shift<true, UP_RIGHT>(pos.pieceBoards[1]);
+		const uint64_t board_noKing = pos.teamBoards[0] ^ BB(pos.kings[1]);
+		attack |= pieceAttack<Bishop>(board_noKing, pos.pieceBoards[2] | pos.pieceBoards[4]);
+		attack |= pieceAttack<Rook>(board_noKing, pos.pieceBoards[3] | pos.pieceBoards[4]);
+		attack |= stepAttack<Knight>(pos.pieceBoards[1]);
+		attack |= kingLookUp[pos.kings[0]];
+		attack |= shift<true, UP_LEFT>(pos.pieceBoards[0]) | shift<true, UP_RIGHT>(pos.pieceBoards[0]);
 	}
 	pos.st.enemyAttack = attack;
 }
@@ -452,7 +458,7 @@ const inline uint64_t MoveGen::stepAttackBB(uint8_t square) const{
 
 template<Piece p>
 const inline uint64_t MoveGen::attackBB(uint64_t board, uint8_t square) const {
-	static_assert(p > 2);
+	static_assert(p > 1);
 	if constexpr (p == Bishop) {
 		return bishopAttack(board, square);
 	}

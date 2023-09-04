@@ -37,7 +37,7 @@ private:
 
 	//Position info
 	Position _pos;
-	std::string _fen;
+	
 
 	//History stack
 	std::stack<StateInfo> prevStates;
