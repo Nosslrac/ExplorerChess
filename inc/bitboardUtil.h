@@ -79,9 +79,10 @@ constexpr uint64_t WHITE_KING_PIECES = BB(61) | BB(62);
 constexpr uint64_t BLACK_QUEEN_PIECES = BB(1) | BB(2) | BB(3);
 constexpr uint64_t BLACK_KING_PIECES = BB(6) | BB(5);
 
-//Attacked squares differ from occupied on queenside
-constexpr uint64_t WHITE_ATTACK_QUEEN = WHITE_QUEEN_PIECES ^ BB(59) ^ BB(60);
+//Attacked squares differ from occupied on queenside, also add king square since king can't be in check
+constexpr uint64_t WHITE_ATTACK_QUEEN = WHITE_QUEEN_PIECES ^ BB(57) ^ BB(60);
 constexpr uint64_t BLACK_ATTACK_QUEEN = BLACK_QUEEN_PIECES ^ BB(1) ^ BB(4);
+
 constexpr uint64_t WHITE_ATTACK_KING = WHITE_KING_PIECES ^ BB(60);
 constexpr uint64_t BLACK_ATTACK_KING = BLACK_KING_PIECES ^ BB(4);
 

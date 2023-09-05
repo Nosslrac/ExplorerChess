@@ -1,5 +1,5 @@
 #include "../inc/Engine.h"
-
+//#define PRINT_OUT
 
 Engine::Engine() {
 	std::cout << "ExplorerChess 1.0. Use help for a list of commands" << std::endl;
@@ -32,18 +32,12 @@ void Engine::runUI() {
 
 
 	if (strcmp(command.c_str(), "fen") == 0) {
-        //fenInit(_pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        fenInit(_pos, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
+        fenInit(_pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        //fenInit(_pos, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
         //fenInit(_pos, "4k3/8/8/8/3p4/8/4P3/3K4 w - - 0 1");
 	}
     else if (strcmp(command.c_str(), "test") == 0) {
-        if (_pos.whiteToMove) {
-            moveIntegrity<true>(_pos);
-        }
-        else {
-            moveIntegrity<false>(_pos);
-        }
-       
+        tests();
     }
     else if (strcmp(command.c_str(), "d") == 0) {
         GUI::print_pieces(_pos);
@@ -97,31 +91,34 @@ void Engine::runUI() {
 
 
 template<bool whiteToMove>
-void Engine::perft(Position& pos, int depth) {
+uint64_t Engine::perft(Position& pos, int depth) {
     MoveList move_list;
     const bool castle = generateAllMoves<whiteToMove>(pos, move_list);
 
-    if (depth < 2) {
+    /*    if (depth < 2) {
         for (int i = 0; i < move_list.size(); ++i) {
             GUI::printMove(move_list.moves[i]);
             std::cout << 1 << std::endl;
         }
         std::cout << "Total positions: " << (int)move_list.size() << std::endl;
-        return;
-    }
+        return ;
+    }*/
 
     uint64_t numPositions = 0;
     for (int i = 0; i < move_list.size(); ++i) {
 
         doMove<whiteToMove>(pos, move_list.moves[i]);
-        uint64_t part = search<!whiteToMove>(pos, depth - 1);
+        const uint64_t part = search<!whiteToMove>(pos, depth - 1);
         numPositions += part;
+#ifdef PRINT_OUT
         GUI::printMove(move_list.moves[i]);
         std::cout << part << std::endl;
+#endif  
         undoMove<!whiteToMove>(pos, move_list.moves[i]);
     }
   
     std::cout << "Total positions: " << numPositions << std::endl;
+    return numPositions;
 }
 
 template<bool whiteToMove>
@@ -131,7 +128,6 @@ uint64_t Engine::search(Position& pos, int depth) {
 
     if (depth > 1) {
         uint64_t numPositions = 0;
-
         for (int i = 0; i < move_list.size(); ++i) {
             doMove<whiteToMove>(pos, move_list.moves[i]);
             numPositions += search<!whiteToMove>(pos, depth - 1);
@@ -259,6 +255,8 @@ void Engine::doMove(Position& pos, uint32_t move) {
 }
 
 
+
+
 template<bool whiteToMove>
 void Engine::undoMove(Position& pos, uint32_t move) {
     pos.st = prevStates.top();
@@ -324,6 +322,7 @@ void Engine::undoMove(Position& pos, uint32_t move) {
                 pos.pieceBoards[1 + getPromo(move)] ^= toBB;
             }
         }
+
     }
     
     pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
@@ -408,5 +407,73 @@ void Engine::fenInit(Position& pos, std::string fen) {
         MoveGen::findAttack<false>(pos);
     }
     
+}
+
+
+void Engine::tests()
+{
+    bool fail = false;
+    Position pos;
+    int testNr = 1;
+    auto test = [&](const char* str,
+        uint64_t count, uint8_t perftLevel = 6) -> void {
+            using namespace std;
+
+            cout << "\nRunning test: " << testNr << endl;
+            fenInit(pos, str);
+
+            auto start = chrono::system_clock::now();
+            uint64_t perftCount = pos.whiteToMove ? Engine::perft<true>(pos, perftLevel) : Engine::perft<false>(pos, perftLevel);
+            auto end = chrono::system_clock::now();
+            chrono::duration<double> elapsed_time = end - start;
+
+            cout << "Time: " << elapsed_time.count() << "s" << endl;
+            cout << "KN/s: "
+                << static_cast<double>(perftCount) / elapsed_time.count() / 1000
+                << endl;
+
+            if (count != perftCount)
+            {
+                cout << "Test " << testNr
+                    << " failed, expected:" << count
+                    << " got: " << perftCount << endl
+                    << "Fen: " << str << endl;
+                fail = true;
+            }
+            else
+            {
+                cout << "Test " << testNr << " success!" << endl;
+            }
+            testNr++;
+    };
+
+    test("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 119060324ULL, 6);
+    // test("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ", 8031647685ULL, 6);
+    test("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ", 11030083ULL, 6);
+    test("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 706045033ULL, 6);
+    test("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  ", 3048196529ULL, 6);
+
+    test("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ", 6923051137ULL, 6);
+    test("3k4/3p4/8/K1P4r/8/8/8/8 b - - 0 1", 130459988ULL, 8);
+    test("8/8/4k3/8/2p5/8/B2P2K1/8 w - - 0 1", 102503850ULL, 8);
+    // test("8/8/1k6/2b5/2pP4/8/5K2/8 b - d3 0 1", 1440467ULL, 6);
+    test("5k2/8/8/8/8/8/8/4K2R w K - 0 1", 73450134ULL, 8);
+    test("3k4/8/8/8/8/8/8/R3K3 w Q - 0 1", 91628014ULL, 8);
+
+    test("r3k2r/1b4bq/8/8/8/8/7B/R3K2R w KQkq - 0 1", 1509218880ULL, 6);
+    test("r3k2r/8/3Q4/8/8/5q2/8/R3K2R b KQkq - 0 1", 2010267707ULL, 6);
+    test("2K2r2/4P3/8/8/8/8/8/3k4 w - - 0 1", 905613447ULL, 8);
+    test("8/8/1P2K3/8/2n5/1q6/8/5k2 b - - 0 1", 197013195ULL, 7);
+    test("4k3/1P6/8/8/8/8/K7/8 w - - 0 1", 397481663ULL, 9);
+
+    test("8/P1k5/K7/8/8/8/8/8 w - - 0 1", 153850274ULL, 9);
+    test("K1k5/8/P7/8/8/8/8/8 w - - 0 1", 85822924ULL, 11);
+    test("8/k1P5/8/1K6/8/8/8/8 w - - 0 1", 173596091ULL, 10);
+    test("8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1", 104644508ULL, 7);
+
+    if (!fail)
+    {
+        std::cout << "Current build cleared all tests" << std::endl;
+    }
 }
 

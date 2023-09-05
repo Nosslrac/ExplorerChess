@@ -55,24 +55,26 @@ const void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list) 
 	constexpr uint32_t mover = King << 24;
 
 	if constexpr (castling) {
+		constexpr uint64_t castleKingAttack = whiteToMove ? WHITE_ATTACK_KING : BLACK_ATTACK_KING;
+		constexpr uint64_t castleQueenAttack = whiteToMove ? WHITE_ATTACK_QUEEN : BLACK_ATTACK_QUEEN;
+		constexpr uint64_t castleKingSquares = whiteToMove ? WHITE_KING_PIECES : BLACK_KING_PIECES;
+		constexpr uint64_t castleQueenSquares = whiteToMove ? WHITE_QUEEN_PIECES : BLACK_QUEEN_PIECES;
+		constexpr uint8_t castleKing = whiteToMove ? 0b0001 : 0b0100;
+		constexpr uint8_t castleQueen = whiteToMove ? 0b0010 : 0b1000;
 		const uint64_t board = pos.teamBoards[0];
 		const uint64_t attack = pos.st.enemyAttack;
-		if constexpr (whiteToMove) {
-			const bool kingSide = !(board & WHITE_KING_PIECES) && !(attack & WHITE_ATTACK_KING) && (pos.st.castlingRights & 0b0001);
-			const bool queenSide = !(board & WHITE_QUEEN_PIECES) && !(attack & WHITE_ATTACK_QUEEN) && (pos.st.castlingRights & 0b0010);
-			move_list.moves[move_list.curr] = (uint32_t)(62 | (60 << 8) | CASTLE_KING | mover) * kingSide;
-			move_list.curr += kingSide;
-			move_list.moves[move_list.curr] = (uint32_t)(58 | (60 << 8) | CASTLE_QUEEN | mover) * queenSide;
-			move_list.curr += queenSide;
+
+		if ((pos.st.castlingRights & castleKing) && ((board & castleKingSquares) == 0) && ((attack & castleKingAttack) == 0)) {
+			constexpr uint32_t to = whiteToMove ? 62 : 6;
+			constexpr uint32_t from = whiteToMove ? 60 << 8 : 4 << 8;
+			move_list.add((uint32_t)(to | from | CASTLE_KING | mover));
 		}
-		else {
-			const bool kingSide = !(board & BLACK_KING_PIECES) && !(attack & BLACK_ATTACK_KING) && (pos.st.castlingRights & 0b0100);
-			const bool queenSide = !(board & BLACK_QUEEN_PIECES) && !(attack & BLACK_ATTACK_QUEEN) && (pos.st.castlingRights & 0b1000);
-			move_list.moves[move_list.curr] = (uint32_t)(6 | (4 << 8) | CASTLE_KING | mover) * kingSide;
-			move_list.curr += kingSide;
-			move_list.moves[move_list.curr] = (uint32_t)(2 | (4 << 8) | CASTLE_QUEEN | mover) * queenSide;
-			move_list.curr += queenSide;
+		if ((pos.st.castlingRights & castleQueen) && ((board & castleQueenSquares) == 0) && ((attack & castleQueenAttack) == 0)) {
+			constexpr uint32_t to = whiteToMove ? 58 : 2;
+			constexpr uint32_t from = whiteToMove ? 60 << 8 : 4 << 8;
+			move_list.add((uint32_t)(to | from | CASTLE_QUEEN | mover));
 		}
+
 	}
 	const uint8_t king = pos.kings[!whiteToMove];
 	const uint64_t moves = kingLookUp[king] & moveableSquares<whiteToMove>(pos) & ~pos.st.enemyAttack;
@@ -324,7 +326,6 @@ const void MoveGen::checks(Position& pos){
 
 /** @brief Finds pinned pieces and their corresponding pinned ray.
 *	It also finds checks given by sliders
-*
 */
 template<bool whiteToMove>
 const void MoveGen::pinnedBoard(Position& pos){

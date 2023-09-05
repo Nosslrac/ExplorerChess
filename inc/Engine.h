@@ -5,6 +5,7 @@
 #include "GUI.h"
 #include "moveGen.h"
 #include <cassert>
+#include <chrono>
 
 class Engine : MoveGen{
 public:
@@ -30,11 +31,12 @@ private:
 	inline void doCastle(Position& pos);
 
 	template<bool whiteToMove>
-	void perft(Position& pos, int depth);
+	uint64_t perft(Position& pos, int depth);
 
 	template<bool whiteToMove>
 	uint64_t search(Position& pos, int depth);
 
+	void tests();
 	//Position info
 	Position _pos;
 	
