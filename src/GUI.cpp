@@ -107,7 +107,7 @@ namespace GUI {
 		}
 		sprintf_s(info, " %c %c%c%c%c %c%c 0 1", side, castle[0], castle[1], castle[2], castle[3], ep[0], ep[1]);
 		
-		std::cout << fen << info;
+		std::cout << fen << info << "\n\n";
 	}
 
 	void parseMove(uint32_t move) {

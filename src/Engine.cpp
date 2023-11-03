@@ -39,7 +39,7 @@ void Engine::runUI() {
 	if (strcmp(command.c_str(), "fen") == 0){
         //fenInit(_pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         //fenInit(_pos, "4k3/8/8/3pP3/5K2/8/8/8/ w d6");
-        fenInit(_pos, "8/8/1k6/2b5/2pP4/8/5K2/8 b - d3 0 1");
+        fenInit(_pos, "2K2r2/4P3/8/8/8/8/8/3k4 w - - 0 1");
 	}
     else if (strcmp(command.c_str(), "test") == 0) {
         tests();
@@ -211,9 +211,176 @@ void Engine::moveIntegrity(Position& pos) {
 
 
 
+template<bool whiteToMove, bool castle>
+void Engine::doMove(Position& pos, uint32_t move) {
+    //Save state info
+    prevStates.push(pos.st);
+
+    //Get move info
+    const uint8_t from = getFrom(move);
+    const uint8_t to = getTo(move);
+    const uint8_t mover = getMover(move);
+    //Captured will be 0 if there is no capture so important to do capture before move
+    const uint8_t captured = getCaptured(move);
+    const uint32_t flags = getFlags(move);
+    const uint64_t fromBB = BB(from);
+    const uint64_t toBB = BB(to);
+
+    constexpr uint8_t team = whiteToMove ? 1 : 2;
+    constexpr uint8_t enemy = whiteToMove ? 2 : 1;
+    constexpr char add = whiteToMove ? 8 : -8;
+    constexpr uint8_t enemyPawn = whiteToMove ? 5 : 0;
+    constexpr uint8_t teamPawn = whiteToMove ? 0 : 5;
+
+    pos.teamBoards[team] ^= fromBB ^ toBB;
+    pos.st.enPassant = 0;
+
+
+
+    if (mover == King) {
+        if constexpr (whiteToMove) {
+            pos.kings[0] = to;
+        }
+        else {
+            pos.kings[1] = to;
+        }
+
+        if (flags & CAPTURE) {
+            pos.pieceBoards[captured] ^= toBB;
+            pos.teamBoards[enemy] ^= toBB;
+        }
+
+        if constexpr (castle) {
+            if (flags == CASTLE_KING) {
+                doCastle<whiteToMove, true>(pos);
+            }
+            else if (flags == CASTLE_QUEEN) {
+                doCastle<whiteToMove, false>(pos);
+            }
+        }
+    }
+    else {
+        pos.pieceBoards[mover] ^= fromBB ^ toBB;
+        switch (flags) {
+        case QUIET: break;
+        case CAPTURE:
+            pos.pieceBoards[captured] ^= toBB;
+            pos.teamBoards[enemy] ^= toBB;
+            break;
+        case DOUBLE_PUSH:
+            pos.st.enPassant = to + add;
+            break;
+        case EP_CAPTURE:
+            pos.pieceBoards[enemyPawn] ^= BB(to + add);
+            pos.teamBoards[enemy] ^= BB(to + add);
+            break;
+        default: //Promotion
+            pos.pieceBoards[teamPawn] ^= toBB;
+            pos.pieceBoards[1 + 5 * !whiteToMove + getPromo(move)] |= toBB;
+            if (flags & CAPTURE) {
+                pos.pieceBoards[captured] ^= toBB;
+                pos.teamBoards[enemy] ^= toBB;
+            }
+            break;
+        }
+    }
+
+    if constexpr (castle) {
+        //Handles if rook is captured or moves
+        pos.st.castlingRights &= castlingModifiers[from];
+        pos.st.castlingRights &= castlingModifiers[to];
+        //TODO: capture of rook needs to update castle hash
+    }
+
+
+    //Restore occupied
+    pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
+
+    pos.whiteToMove = !whiteToMove;
+
+    //Prepare for next movegeneration
+    _moveGen->findAttack<!whiteToMove>(pos);
+    _moveGen->pinnedBoard<!whiteToMove>(pos);
+    _moveGen->checks<!whiteToMove>(pos);
+}
 
 
 template<bool whiteToMove, bool castle>
+void Engine::undoMove(Position& pos, uint32_t move) {
+    pos.st = prevStates.top();
+    prevStates.pop();
+
+    //Get move info
+    const uint8_t from = getFrom(move);
+    const uint8_t to = getTo(move);
+    const uint8_t mover = getMover(move);
+    //Captured will be 0 if there is no capture so important to do capture before move
+    const uint8_t captured = getCaptured(move);
+    const uint32_t flags = getFlags(move);
+
+    const uint64_t fromBB = BB(from);
+    const uint64_t toBB = BB(to);
+
+    constexpr uint8_t team = whiteToMove ? 2 : 1;
+    constexpr uint8_t enemy = whiteToMove ? 1 : 2;
+    constexpr char add = whiteToMove ? -8 : 8;
+    constexpr uint8_t enemyPawn = whiteToMove ? 0 : 5;
+    constexpr uint8_t teamPawn = whiteToMove ? 5 : 0;
+
+    if (mover == King) {
+        pos.kings[whiteToMove] = from;
+
+        if (flags & CAPTURE) {
+            pos.pieceBoards[captured] ^= toBB;
+            pos.teamBoards[enemy] ^= toBB;
+        }
+
+        if constexpr (castle) {
+            if (flags == CASTLE_KING) {
+                doCastle<!whiteToMove, true>(pos);
+            }
+            else if (flags == CASTLE_QUEEN) {
+                doCastle<!whiteToMove, false>(pos);
+            }
+        }
+    }
+    else {
+        pos.pieceBoards[mover] ^= fromBB ^ toBB;
+
+        switch (flags) {
+        case QUIET: break;
+        case CAPTURE:
+            pos.pieceBoards[captured] ^= toBB;
+            pos.teamBoards[enemy] ^= toBB;
+            break;
+        case DOUBLE_PUSH:
+            break;
+        case EP_CAPTURE:
+            pos.pieceBoards[enemyPawn] ^= BB(to + add);
+            pos.teamBoards[enemy] ^= BB(to + add);
+            break;
+        default: //Promotion
+            pos.pieceBoards[teamPawn] ^= toBB;
+            pos.pieceBoards[1 + teamPawn + getPromo(move)] ^= toBB;
+            if (flags & CAPTURE) {
+                pos.pieceBoards[captured] ^= toBB;
+                pos.teamBoards[enemy] ^= toBB;
+            }
+            break;
+        }
+    }
+
+    pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
+
+    pos.whiteToMove = !whiteToMove;
+}
+
+
+
+
+
+/*
+* template<bool whiteToMove, bool castle>
 void Engine::doMove(Position& pos, uint32_t move) {
     //Save state info
     prevStates.push(pos.st);
@@ -229,7 +396,43 @@ void Engine::doMove(Position& pos, uint32_t move) {
     const uint64_t fromBB = BB(from);
     const uint64_t toBB = BB(to);
     
-    const uint64_t capMask = toBB * (((flags & CAPTURE) == CAPTURE) && flags != EP_CAPTURE);
+    constexpr uint8_t team = whiteToMove ? 1 : 2;
+    constexpr uint8_t enemy = whiteToMove ? 2 : 1;
+    constexpr char add = whiteToMove ? 8 : -8;
+    constexpr uint8_t enemyPawn = whiteToMove ? 5 : 0;
+    constexpr uint8_t teamPawn = whiteToMove ? 0 : 5;
+
+    pos.teamBoards[team] ^= fromBB ^ toBB;
+    pos.st.enPassant = 0;
+
+    switch (flags) {
+    case QUIET: break;
+    case CASTLE_KING: doCastle<whiteToMove, true>(pos); break;
+    case CASTLE_QUEEN: doCastle<whiteToMove, false>(pos); break;
+    case CAPTURE:
+        pos.pieceBoards[captured] ^= toBB;
+        pos.teamBoards[enemy] ^= toBB;
+        break;
+    case DOUBLE_PUSH:
+        pos.st.enPassant = to + add;
+        break;
+    case EP_CAPTURE:
+        pos.pieceBoards[enemyPawn] ^= BB(to + add);
+        pos.teamBoards[enemy] ^= BB(to + add);
+        break;
+    default: //Promotion
+        pos.pieceBoards[teamPawn] ^= toBB;
+        pos.pieceBoards[1 + 5 * !whiteToMove + getPromo(move)] |= toBB;
+        if (flags & CAPTURE) {
+            pos.pieceBoards[captured] ^= toBB;
+            pos.teamBoards[enemy] ^= toBB;
+        }
+        break;
+    }
+
+
+
+        const uint64_t capMask = toBB * (((flags & CAPTURE) == CAPTURE) && flags != EP_CAPTURE);
     //Incrementally update position
     if constexpr (whiteToMove) {
         pos.teamBoards[1] ^= fromBB ^ toBB;
@@ -241,79 +444,87 @@ void Engine::doMove(Position& pos, uint32_t move) {
         pos.teamBoards[1] ^= capMask;
         pos.st.enPassant = (flags == DOUBLE_PUSH) * (to - 8);
     }
-
     pos.pieceBoards[captured] ^= capMask;
 
-    if (mover == King) {
-        if constexpr (whiteToMove) {
-            pos.kings[0] = to;
+
+
+    
+
+if (mover == King) {
+    if constexpr (whiteToMove) {
+        pos.kings[0] = to;
+    }
+    else {
+        pos.kings[1] = to;
+    }
+         if constexpr (castle) {
+        if (flags == CASTLE_KING) {
+            doCastle<whiteToMove, true>(pos);
         }
-        else {
-            pos.kings[1] = to;
+        else if (flags == CASTLE_QUEEN) {
+            doCastle<whiteToMove, false>(pos);
         }
-        if constexpr (castle) {
-            if (flags == CASTLE_KING) {
-                doCastle<whiteToMove, true>(pos);
-            }
-            else if (flags == CASTLE_QUEEN) {
-                doCastle<whiteToMove, false>(pos);
-            }    
-        }
+    }
+
+
+
+}
+else {
+    pos.pieceBoards[mover] ^= fromBB ^ toBB;
+
+    //EP: remove pawn if there is a EP capture and update ep if there is a double push
+    //And promotions
+
+     if constexpr (whiteToMove) {
+        const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to + 8);
+        pos.pieceBoards[5] ^= ep_cap;
+        pos.teamBoards[2] ^= ep_cap;
 
     }
     else {
-        pos.pieceBoards[mover] ^= fromBB ^ toBB;
+        const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to - 8);
+        pos.pieceBoards[0] ^= ep_cap;
+        pos.teamBoards[1] ^= ep_cap;
 
-        //EP: remove pawn if there is a EP capture and update ep if there is a double push
-        //And promotions
+    }
+
+
+
+          if ((flags & PROMO_N) != 0) {
         if constexpr (whiteToMove) {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to + 8);
-            pos.pieceBoards[5] ^= ep_cap;
-            pos.teamBoards[2] ^= ep_cap;
-            
+            pos.pieceBoards[0] ^= toBB;
+            pos.pieceBoards[1 + getPromo(move)] |= toBB;
         }
         else {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to - 8);
-            pos.pieceBoards[0] ^= ep_cap;
-            pos.teamBoards[1] ^= ep_cap;
-            
-        }
-
-        if ((flags & PROMO_N) != 0) {
-            if constexpr (whiteToMove) {
-                pos.pieceBoards[0] ^= toBB;
-                pos.pieceBoards[1 + getPromo(move)] |= toBB;
-            }
-            else {
-                pos.pieceBoards[5] ^= toBB;
-                pos.pieceBoards[6 + getPromo(move)] |= toBB;
-            }
+            pos.pieceBoards[5] ^= toBB;
+            pos.pieceBoards[6 + getPromo(move)] |= toBB;
         }
     }
 
-    if constexpr (castle) {
-        //Handles if rook is captured or moves
-        pos.st.castlingRights &= castlingModifiers[from];
-        pos.st.castlingRights &= castlingModifiers[to];
-        //TODO: capture of rook needs to update castle hash
-    }
 
+}
 
-    //Restore occupied
-    pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
-    
-    pos.whiteToMove = !whiteToMove;
-
-    //Prepare for next movegeneration
-    _moveGen->findAttack<!whiteToMove>(pos);
-    _moveGen->pinnedBoard<!whiteToMove>(pos);
-    _moveGen->checks<!whiteToMove>(pos);
+if constexpr (castle) {
+    //Handles if rook is captured or moves
+    pos.st.castlingRights &= castlingModifiers[from];
+    pos.st.castlingRights &= castlingModifiers[to];
+    //TODO: capture of rook needs to update castle hash
 }
 
 
+//Restore occupied
+pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
 
+pos.whiteToMove = !whiteToMove;
 
-template<bool whiteToMove, bool castle>
+//Prepare for next movegeneration
+_moveGen->findAttack<!whiteToMove>(pos);
+_moveGen->pinnedBoard<!whiteToMove>(pos);
+_moveGen->checks<!whiteToMove>(pos);
+}
+*/
+
+/*template<bool whiteToMove, bool castle>
 void Engine::undoMove(Position& pos, uint32_t move) {
     pos.st = prevStates.top();
     prevStates.pop();
@@ -388,7 +599,85 @@ void Engine::undoMove(Position& pos, uint32_t move) {
     pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
     
     pos.whiteToMove = !whiteToMove;
-}
+}*/
+
+/*template<bool whiteToMove, bool castle>
+void Engine::undoMove(Position& pos, uint32_t move) {
+    pos.st = prevStates.top();
+    prevStates.pop();
+
+    //Get move info
+    const uint8_t from = getFrom(move);
+    const uint8_t to = getTo(move);
+    const uint8_t mover = getMover(move);
+    //Captured will be 0 if there is no capture so important to do capture before move
+    const uint8_t captured = getCaptured(move);
+    const uint32_t flags = getFlags(move);
+
+    const uint64_t fromBB = BB(from);
+    const uint64_t toBB = BB(to);
+    const uint64_t capMask = toBB * (((flags & CAPTURE) == CAPTURE) && flags != EP_CAPTURE);
+
+    //Incrementally update position
+    if constexpr (whiteToMove) {
+        pos.teamBoards[2] ^= fromBB ^ toBB;
+        pos.teamBoards[1] ^= capMask;
+    }
+    else {
+        pos.teamBoards[1] ^= fromBB ^ toBB;
+        pos.teamBoards[2] ^= capMask;
+    }
+
+    pos.pieceBoards[captured] ^= capMask;
+
+    if (mover == King) {
+        pos.kings[whiteToMove] = from;
+
+
+        if constexpr (castle) {
+            if (flags == CASTLE_KING) {
+                doCastle<!whiteToMove, true>(pos);
+            }
+            else if (flags == CASTLE_QUEEN) {
+                doCastle<!whiteToMove, false>(pos);
+            }
+        }
+        
+    }
+    else {
+        pos.pieceBoards[mover] ^= fromBB ^ toBB;
+
+        //EP: add the ep pawn if there was an ep capture
+        if constexpr (whiteToMove) {
+            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to - 8);
+            pos.pieceBoards[0] ^= ep_cap;
+            pos.teamBoards[1] ^= ep_cap;
+        }
+        else {
+            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to + 8);
+            pos.pieceBoards[5] ^= ep_cap;
+            pos.teamBoards[2] ^= ep_cap;
+        }
+
+        //Pawn promotion
+        if ((flags & PROMO_N) != 0) {
+            if constexpr (whiteToMove) {
+                pos.pieceBoards[5] ^= toBB;
+                pos.pieceBoards[6 + getPromo(move)] ^= toBB;
+            }
+            else {
+                pos.pieceBoards[0] ^= toBB;
+                pos.pieceBoards[1 + getPromo(move)] ^= toBB;
+            }
+        }
+
+    }
+    
+    pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
+    
+    pos.whiteToMove = !whiteToMove;
+}*/
+
 
 template<bool whiteToMove, bool castleKing>
 inline void Engine::doCastle(Position& pos) {
@@ -569,12 +858,11 @@ void Engine::tests()
     results.push_back(test("8/k1P5/8/1K6/8/8/8/8 w - - 0 1", 173596091ULL, 10));
     results.push_back(test("8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1", 104644508ULL, 7));
 
-
+    const double geo_mean = geometric_mean(results);
+    std::cout << "Average kN/s: " << geo_mean << std::endl;
     if (!fail)
     {
-        const double geo_mean = geometric_mean(results);
-        std::cout << "Current build cleared all tests" << std::endl;
-        std::cout << "Average kN/s: " << geo_mean << std::endl;
+        std::cout << "Current build cleared all tests" << std::endl; 
     }
 }
 
