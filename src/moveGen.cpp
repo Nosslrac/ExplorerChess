@@ -45,7 +45,7 @@ const bool MoveGen::generateAllMoves(const Position& pos, MoveList& move_list) c
 	case 0b110: generateMoves<whiteToMove, true, true, false>(pos, move_list); break;
 	default: generateMoves<whiteToMove, true, true, true>(pos, move_list);
 	}
-	return castling;
+	return static_cast<bool>(pos.st.castlingRights);
 }
 
 
@@ -81,7 +81,7 @@ const void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list) 
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
 
 	makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, king, CAPTURE | mover);
-	makePieceMove(move_list, moves & ~enemy, king, NO_FLAG | mover);
+	makePieceMove(move_list, moves & ~enemy, king, QUIET | mover);
 
 	
 }
@@ -103,16 +103,7 @@ const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list) 
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
 	const uint64_t nonOccupied = ~pos.teamBoards[0];
 	const uint64_t block = pos.st.blockForKing;
-
-	//Non promotion push
-	//TODO: when incheck the double push does't work
 	const uint64_t nonPromo = pawns & ~promoRank;
-	uint64_t push = shift<whiteToMove, UP>(nonPromo) & nonOccupied;
-	uint64_t doublePush = shift<whiteToMove, UP>(push & doublePotential) & nonOccupied & block;
-	push &= block;
-
-	makePawnMove<pins, false>(pos, move_list, push, back, NO_FLAG | pID);
-	makePawnMove<pins, false>(pos, move_list, doublePush, back * 2, DOUBLE_PUSH | pID);
 
 
 	//Captures
@@ -124,8 +115,20 @@ const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list) 
 	makePawnCapture<whiteToMove, pins, false>(pos, move_list, capLeft, backLeft, CAPTURE | pID);
 	makePawnCapture<whiteToMove, pins, false>(pos, move_list, capRight, backRight, CAPTURE | pID);
 
+	//Non promotion push
+	//TODO: when incheck the double push does't work
+
+	uint64_t push = shift<whiteToMove, UP>(nonPromo) & nonOccupied;
+	uint64_t doublePush = shift<whiteToMove, UP>(push & doublePotential) & nonOccupied & block;
+	push &= block;
+
+	makePawnMove<pins, false>(pos, move_list, push, back, QUIET | pID);
+	makePawnMove<pins, false>(pos, move_list, doublePush, back * 2, DOUBLE_PUSH | pID);
+
+
 	//Promotions
 	uint64_t promo = pawns & promoRank;
+
 	if (promo) {
 		uint64_t push = shift<whiteToMove, UP>(promo) & nonOccupied & block;
 		uint64_t capLeft = shift<whiteToMove, UP_LEFT>(promo) & enemy & block;
@@ -156,12 +159,12 @@ const void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list)
 		bishops &= bishops - 1;
 		uint64_t moves = attackBB<p>(pos.teamBoards[0], b) & nonTeam & block;
 		if constexpr (pins) {
-			if ((1ULL << b) & pos.st.pinnedMask) {
+			if (BB(b) & pos.st.pinnedMask) {
 				moves &= LineBB[b][pos.kings[!whiteToMove]];
 			}
 		}
 		makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, b, CAPTURE | pID);
-		makePieceMove(move_list, moves & ~enemy, b, NO_FLAG | pID);
+		makePieceMove(move_list, moves & ~enemy, b, QUIET | pID);
 	}
 }
 
@@ -182,7 +185,7 @@ const void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list
 		knights &= knights - 1;
 		const uint64_t moves = stepAttackBB<Knight>(kn) & nonTeam & pos.st.blockForKing;
 		makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, kn, CAPTURE | pID);
-		makePieceMove(move_list, moves & ~enemy, kn, NO_FLAG | pID);
+		makePieceMove(move_list, moves & ~enemy, kn, QUIET | pID);
 	}
 }
 
@@ -247,7 +250,7 @@ const inline void MoveGen::makePawnMove(const Position& pos, MoveList& move_list
 		if constexpr (pin) {
 			const uint8_t from = toSQ + back;
 			//Only add if the pawn isn't pinned or the move moves along the pin
-			if (((1ULL << from) & pos.st.pinnedMask) == 0 || ((1ULL << toSQ) & LineBB[from][pos.kings[!pos.whiteToMove]])) {
+			if ((BB(from) & pos.st.pinnedMask) == 0 || (BB(toSQ) & LineBB[from][pos.kings[!pos.whiteToMove]])) {
 				constructMove<isPromotion>(move_list, from, toSQ, flagAndPieces);
 			}
 
@@ -268,7 +271,7 @@ const inline void MoveGen::makePawnCapture(const Position& pos, MoveList& move_l
 		if constexpr (pin) {
 			const uint8_t from = toSQ + back;
 			//Only add if the pawn isn't pinned or the move moves along the pin
-			if (((1ULL << from) & pos.st.pinnedMask) == 0 || ((1ULL << toSQ) & LineBB[from][pos.kings[!pos.whiteToMove]])) {
+			if ((BB(from) & pos.st.pinnedMask) == 0 || (BB(toSQ) & LineBB[from][pos.kings[!pos.whiteToMove]])) {
 				constructMove<isPromotion>(move_list, from, toSQ, flagUpdate);
 			}
 
@@ -312,7 +315,7 @@ const void MoveGen::checks(Position& pos){
 
 	//Opposite color knights
 	const uint64_t knightCheck = stepAttackBB<Knight>(king) & getPieces<!whiteToMove, Knight>(pos);
-	const uint64_t pawnCheck = pawnAttackBB<whiteToMove>(1ULL << king) & getPieces<!whiteToMove, Pawn>(pos);
+	const uint64_t pawnCheck = pawnAttackBB<whiteToMove>(BB(king)) & getPieces<!whiteToMove, Pawn>(pos);
 
 	//Is either a knight or pawn, cannot be both so bool is no problem
 	pos.st.numCheckers += (const bool)(knightCheck | pawnCheck);
@@ -339,26 +342,26 @@ const void MoveGen::pinnedBoard(Position& pos){
 
 	const uint64_t occupancy = pos.teamBoards[0];
 	const uint64_t team = getTeam<whiteToMove>(pos);
-	
+
+	unsigned long sq;
 	while (snipers) {
 		//Pop first sniper
-		uint8_t sq = long_bit_scan(snipers);
+		bitScan(&sq, snipers);
 		snipers &= snipers - 1;
 
 		//Find squares between the pieces and the pieces
 		const uint64_t betweenSquares = betweenBB(sq, king);
 		const uint64_t betweenPieces = betweenSquares & occupancy;
 
-		//It is a check if there is no piece between
-		const bool isCheck = !bitCount(betweenPieces);
-		//It is a pin if there is excactly one piece from the kings side between
-		const bool isPin = (bitCount(betweenPieces) == 1) && (betweenPieces & team);
-
 		//Update masks
-		blockForKing |= isCheck * (betweenSquares | (1ULL << sq));
-		pinned |= isPin * (betweenSquares | (1ULL << sq));
-		//Update checkers
-		numCheckers += isCheck;
+		const int count = bitCount(betweenPieces);
+		if (count == 0) {
+			blockForKing |= betweenSquares | BB(sq);
+			numCheckers++;
+		}
+		else if (count == 1) {
+			pinned |= betweenSquares | BB(sq);
+		}
 	}
 	//Update pos
 	pos.st.blockForKing = blockForKing;

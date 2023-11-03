@@ -153,6 +153,7 @@
     <ClCompile Include="src\ExplorerChess.cpp" />
     <ClCompile Include="src\GUI.cpp" />
     <ClCompile Include="src\moveGen.cpp" />
+    <ClCompile Include="src\zobristHash.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\attacks.h" />
@@ -160,6 +161,7 @@
     <ClInclude Include="inc\Engine.h" />
     <ClInclude Include="inc\GUI.h" />
     <ClInclude Include="inc\moveGen.h" />
+    <ClInclude Include="inc\zobristHash.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

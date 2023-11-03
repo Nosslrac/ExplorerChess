@@ -1,0 +1,11 @@
+Build_v1:
+Avg kN/s: 240837
+
+Build_v2:
+Check for pawns on EP rank in make move to more often template out en passant
+Avg kN/s: 225627
+
+
+Build_v3:
+Template castling rights in the search algorithm
+Avg kN/s: 242424

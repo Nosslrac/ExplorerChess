@@ -38,6 +38,7 @@ namespace GUI {
 		}
 		std::cout << "--------------------\n";
 		getPositionFen(pos);
+		//std::cout << "\nHash key: " << pos.st.hashKey << "\n\n";
 	}
 
 	//Initiates a piece array for display in cmd
@@ -86,17 +87,27 @@ namespace GUI {
 				fen += pBoard[i];
 			}
 		}
-		char info[20];
+		char info[25];
 		const char side = fenMove[!pos.whiteToMove];
 		char castle[4];
 		uint8_t legal = pos.st.castlingRights;
 		for (int i = 0; i < 4; i++) {
-			castle[i] = (legal & 1) == 1 ? fenCastle[i] : 0;
+			castle[i] = (legal & 1) == 1 ? fenCastle[i] : '-';
 			legal >>= 1;
 		}
-		sprintf_s(info, " %c %c%c%c%c - 0 1", side, castle[0], castle[1], castle[2], castle[3]);
+		char ep[2] = {'-', 0};
 
-		std::cout << fen << info << "\n\n";
+		
+
+		if (pos.st.enPassant != 0) {
+			char file = 'a' + pos.st.enPassant % 8;
+			char rank = '0' + 8 - pos.st.enPassant / 8;
+			ep[0] = file;
+			ep[1] = rank;
+		}
+		sprintf_s(info, " %c %c%c%c%c %c%c 0 1", side, castle[0], castle[1], castle[2], castle[3], ep[0], ep[1]);
+		
+		std::cout << fen << info;
 	}
 
 	void parseMove(uint32_t move) {
@@ -110,7 +121,7 @@ namespace GUI {
 		switch (flags)
 		{
 		case CAPTURE: fString = "CAPTURE"; break;
-		case NO_FLAG: fString = "NO_FLAG"; break;
+		case QUIET: fString = "QUIET"; break;
 		case EP_CAPTURE: fString = "EP_CAPTURE"; break;
 		case DOUBLE_PUSH: fString = "DOUBLE_PUSH"; break;
 		case CASTLE_KING: fString = "CASTLE_KING"; break;
@@ -122,7 +133,7 @@ namespace GUI {
 		sprintf_s(buff, "From: %d, To: %d, Mover: %d, Captured: %d, ", from, to, mover, capped);
 		std::cout << buff << "Flags: " + fString << std::endl;
 
-		GUI::print_bit_board(1ULL << from | 1ULL << to);
+		GUI::print_bit_board(BB(from) | BB(to));
 	}
 
 	void printMove(uint32_t move) {
@@ -150,5 +161,6 @@ namespace GUI {
 		}
 		return 0;
 	}
+
 }
 

@@ -34,7 +34,7 @@ enum Direction {
 };
 
 enum MoveFlags {
-	NO_FLAG = 0,
+	QUIET = 0,
 	DOUBLE_PUSH = 0x10000,
 	CASTLE_KING = 0x20000,
 	CASTLE_QUEEN = 0x30000,
@@ -96,6 +96,8 @@ struct StateInfo {
 	uint8_t numCheckers;
 	uint8_t castlingRights;
 	uint8_t enPassant;
+
+	//uint64_t hashKey;
 };
 
 //Inherits irreversible info from StateInfo 
