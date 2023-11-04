@@ -97,7 +97,7 @@ struct StateInfo {
 	uint8_t castlingRights;
 	uint8_t enPassant;
 
-	//uint64_t hashKey;
+	uint64_t hashKey;
 };
 
 //Inherits irreversible info from StateInfo 
@@ -108,6 +108,7 @@ struct Position {
 	uint64_t teamBoards[3];
 
 	bool whiteToMove;
+	uint16_t ply;
 
 	bool operator ==(const Position& pos) {
 		return memcmp(this, &pos, sizeof(Position)) == 0;

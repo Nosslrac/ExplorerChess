@@ -62,6 +62,7 @@ uint64_t ZobristHash::hashPosition(const Position& pos) {
         const uint8_t file = pos.st.enPassant & 7;
         posHash ^= epHash[file];
     }
+    posHash ^= moveHash * pos.ply;
 
     return posHash;
 }

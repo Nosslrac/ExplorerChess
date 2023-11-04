@@ -23,27 +23,29 @@ namespace GUI {
 	void print_pieces(const Position& pos) {
 		char pBoard[64];
 		fillPieceArray(pos, pBoard);
+		char rank = '8';
 		std::string stb = "";
-		stb += "--------------------\n";
+		stb += "\n +---+---+---+---+---+---+---+---+\n";
 		for (int i = 0; i < 8; i++) {
-			stb += "| ";
 			for (int j = 0; j < 8; j++) {
+				stb += " | ";
 				stb += pBoard[i * 8 + j];
-				stb += ' ';
 			}
-			stb += " |";
+			stb += " | ";
+			stb += rank;
+			rank--;
 			std::cout << stb;
-			std::cout << "\n";
+			std::cout << "\n +---+---+---+---+---+---+---+---+\n";
 			stb = "";
 		}
-		std::cout << "--------------------\n";
+		std::cout << "   a   b   c   d   e   f   g   h\n\n";
 		getPositionFen(pos);
 		//std::cout << "\nHash key: " << pos.st.hashKey << "\n\n";
 	}
 
 	//Initiates a piece array for display in cmd
 	void fillPieceArray(const Position& pos, char pBoard[]) {
-		std::fill_n(pBoard, 64, '-');
+		std::fill_n(pBoard, 64, ' ');
 		for (int i = 0; i < 10; i++) {
 			uint64_t pieces = pos.pieceBoards[i];
 			unsigned long sq;
@@ -76,7 +78,7 @@ namespace GUI {
 				}
 				fen += '/';
 			}
-			if (pBoard[i] == '-') {
+			if (pBoard[i] == ' ') {
 				empty++;
 			}
 			else {

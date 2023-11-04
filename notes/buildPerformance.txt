@@ -9,3 +9,31 @@ Avg kN/s: 225627
 Build_v3:
 Template castling rights in the search algorithm
 Avg kN/s: 242424
+
+
+------LAPTOP TESTING (ABOUT 50 % LOWER NUMBERS EXPECTED)---------
+
+Build normal make move:
+Avg kN/s:
+185,372
+184,662
+179,840
+
+Build switch case make move:
+Avg kN/s:
+184,258
+188,309
+188,262
+193,253
+
+Build with incremental hash in doMove implemented (switch case make move, which works better with hashing aswell):
+Avg kN/s:
+180,493
+174,166
+178,471
+
+Above build when utilizing hashing in the search:
+Avg kN/s:
+1,029,550
+1,070,330 
+1,063,730

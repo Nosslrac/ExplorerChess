@@ -43,6 +43,8 @@ private:
 	//Position info
 	Position _pos;
 	MoveGen* _moveGen;
+	ZobristHash* _zobristHash;
+	uint64_t hashHits;
 	
 
 	//History stack
