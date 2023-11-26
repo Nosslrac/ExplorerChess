@@ -8,12 +8,16 @@
 Engine::Engine() {
 	std::cout << "ExplorerChess 1.0. Use help for a list of commands" << std::endl;
     _pos = {};
+    nodes = 0;
     _moveGen = new MoveGen();
     _zobristHash = new ZobristHash();
+    _evaluation = new Evaluation(_moveGen);
 }
 
 Engine::~Engine() {
-    delete(&_pos);
+    delete(_moveGen);
+    delete(_zobristHash);
+    delete(_evaluation);
 }
 
 void Engine::run() {
@@ -30,20 +34,40 @@ void Engine::runUI() {
 	std::string userInput;
 	std::getline(std::cin, userInput);
 
-	size_t commandEnd = userInput.find(' ');
+	size_t commandEnd1 = userInput.find(' ');
+    size_t commandEnd2 = userInput.find(' ', commandEnd1 + 1);
+    commandEnd2 = commandEnd2 > userInput.size() ? userInput.size()  : commandEnd2;
 
-	std::string command = userInput.substr(0, commandEnd);
-    std::string arg = userInput.substr(commandEnd + 1, userInput.size());
+	std::string command = userInput.substr(0, commandEnd1);
+    std::string arg = userInput.substr(commandEnd1 + 1, commandEnd2 - commandEnd1 - 1);
+   
 
 
+	if (strcmp(command.c_str(), "position") == 0){
+        
+        if (strcmp(arg.c_str(), "startpos") == 0) {
+            fenInit(_pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        }
+        else if (strcmp(arg.c_str(), "fen") == 0) {
+            std::string arg2 = userInput.substr(commandEnd2 + 1);
+            fenInit(_pos, arg2);
+        }
 
-	if (strcmp(command.c_str(), "fen") == 0){
-        //fenInit(_pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        fenInit(_pos, "4k3/1P6/8/8/8/8/K7/8 w - - 0 1");
-        //fenInit(_pos, "r1n1kn1r/4pp2/6N1/1NPp2P1/2p3p1/8/3PPP2/R3K2R w KQkq d6 0 1");
 	}
     else if (strcmp(command.c_str(), "test") == 0) {
         tests();
+    }
+    else if (strcmp(command.c_str(), "analyse") == 0) {
+        Move move;
+        const int depth = std::stoi(arg);
+        if (_pos.whiteToMove) {
+            move = analysis<true>(_pos, depth);
+        }
+        else {
+            move = analysis<false>(_pos, depth);
+        }
+        GUI::printMove(move.move);
+        std::cout << "\nNodes searched: " << nodes << "\nEval: " << move.eval << std::endl;
     }
     else if (strcmp(command.c_str(), "hashTest") == 0) {
         MoveList ml;
@@ -79,9 +103,7 @@ void Engine::runUI() {
         GUI::print_pieces(_pos);
     }
     else if (strcmp(command.c_str(), "g") == 0) {
-        MoveList ml;
-        _moveGen->generateAllMoves<true>(_pos, ml);
-        GUI::parseMove(ml.moves[std::stoi(arg)]);
+        GUI::print_bit_board(_pos.st.pinnedMask);
     }
     else if (strcmp(command.c_str(), "state") == 0) {
         GUI::printState(_pos.st);
@@ -121,20 +143,26 @@ void Engine::runUI() {
             perft<false>(_pos, depth);
         } 
     }
+    else {
+        std::cout << "Command not found\n";
+    }
 }
 
+//---------------------------------------------------------------------
+//---------------------- Perft ----------------------------------------
+//---------------------------------------------------------------------
 
 template<bool whiteToMove>
 uint64_t Engine::perft(Position& pos, int depth) {
-    hashHits = 0;
     MoveList move_list;
     const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+    nodes = 0;
 
 #ifndef SHALLOW_SEARCH
     if (depth < 2) {
         for (int i = 0; i < move_list.size(); ++i) {
             GUI::printMove(move_list.moves[i]);
-            std::cout << 1 << std::endl;
+            std::cout << ": " << 1 << std::endl;
         }
         std::cout << "Total positions: " << (int)move_list.size() << std::endl;
         return move_list.size();
@@ -150,7 +178,7 @@ uint64_t Engine::perft(Position& pos, int depth) {
             numPositions += part;
 #ifdef PRINT_OUT
             GUI::printMove(move_list.moves[i]);
-            std::cout << part << std::endl;
+            std::cout << ": " << part << std::endl;
 #endif  
             undoMove<!whiteToMove, true>(pos, move_list.moves[i]);
         }
@@ -163,30 +191,29 @@ uint64_t Engine::perft(Position& pos, int depth) {
             numPositions += part;
 #ifdef PRINT_OUT
             GUI::printMove(move_list.moves[i]);
-            std::cout << part << std::endl;
+            std::cout << ": " << part << std::endl;
 #endif  
             undoMove<!whiteToMove, false>(pos, move_list.moves[i]);
         }
     }
     
-  
-    std::cout << "Total positions: " << numPositions << "\nHash hits: " << hashHits << std::endl;
+#ifdef PRINT_OUT
+    std::cout << "Total positions: " << numPositions << "\nNodes searched: " << nodes << std::endl;
+#endif
     _transpositionTable.clear();
     return numPositions;
 }
 
 template<bool whiteToMove, bool castle>
 uint64_t Engine::search(Position& pos, int depth) {
-
-    if (_transpositionTable.find(pos.st.hashKey) != _transpositionTable.end()) {
-        hashHits++;
+    nodes++;
+    if (_transpositionTable.contains(pos.st.hashKey)) {
         return _transpositionTable.at(pos.st.hashKey);
     }
 
 #ifdef SHALLOW_SEARCH
     MoveList move_list;
     const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
-
     if (depth > 1) {
         uint64_t numPositions = 0;
         if constexpr (castle) {
@@ -227,6 +254,110 @@ uint64_t Engine::search(Position& pos, int depth) {
 }
 
 
+//---------------------------------------------------------------------
+//---------------------- Evaluation search ----------------------------
+//---------------------------------------------------------------------
+
+template<bool whiteToMove>
+Move Engine::analysis(Position& pos, int depth) {
+    //_bestMoves = std::priority_queue<Move, std::vector<Move>>();
+    MoveList move_list;
+    const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+    nodes = 0;
+    Move bestMove = { CHECK_MATE, move_list.moves[0]}; //Initiate first move with worst possible eval
+
+    
+    if (castle) {
+        for (int i = 0; i < move_list.size(); ++i) {
+            doMove<whiteToMove, true>(pos, move_list.moves[i]);
+            const int eval = -negaMax<!whiteToMove, true>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            if (eval > bestMove.eval) {
+                bestMove = { eval, move_list.moves[i] };
+            }
+            undoMove<!whiteToMove, true>(pos, move_list.moves[i]);
+        }
+    }
+    else {
+        for (int i = 0; i < move_list.size(); ++i) {
+            doMove<whiteToMove, false>(pos, move_list.moves[i]);
+            const int eval = -negaMax<!whiteToMove, false>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            if (eval > bestMove.eval) {
+                bestMove = { eval, move_list.moves[i] };
+            }
+            undoMove<!whiteToMove, false>(pos, move_list.moves[i]);
+        }
+    }
+    _evalTransposition.clear();
+    if constexpr (!whiteToMove) {
+        bestMove.eval = -bestMove.eval;
+    }
+    return bestMove;
+}
+
+template<bool whiteToMove, bool castle>
+int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
+    //Negamax with alpha beta pruning
+    nodes++;
+    if (_evalTransposition.find(pos.st.hashKey) != _evalTransposition.end()) {
+        return _evalTransposition.at(pos.st.hashKey);
+    }
+    
+    if (depth == 0) {
+        return _evaluation->evaluate<whiteToMove>(pos);
+    }
+
+    MoveList move_list;
+    const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+
+    if (move_list.size() == 0) {
+        if (pos.st.checkers) {
+            return CHECK_MATE - depth; //depth makes sure we get the fastest checkmate as the best one
+        }
+        return 0; //Stale mate
+    }
+    //Do some move ordering (maybe do move ordering already in the generation
+    MoveOrder::moveSort(move_list, pos, depth);
+
+    if constexpr (castle) {
+        if (castleAllowed) {
+            for (int i = 0; i < move_list.size(); ++i) {
+                doMove<whiteToMove, true>(pos, move_list.moves[i]);
+                const int eval = -negaMax<!whiteToMove, true>(pos, -beta, -alpha, depth - 1);
+                undoMove<!whiteToMove, true>(pos, move_list.moves[i]);
+                if (eval >= beta) {
+                    return beta;
+                }
+                if(eval > alpha) {
+                    alpha = eval;
+                }
+                
+            }
+            return alpha;
+        }
+
+    }
+    for (int i = 0; i < move_list.size(); ++i) {
+        doMove<whiteToMove, false>(pos, move_list.moves[i]);
+        const int eval = -negaMax<!whiteToMove, false>(pos, -beta, -alpha, depth - 1);
+        undoMove<!whiteToMove, false>(pos, move_list.moves[i]);
+        if (eval >= beta) {
+            return beta;
+        }
+        if (eval > alpha) {
+            alpha = eval;
+        }
+
+    }
+    if (depth > 1) {
+        _evalTransposition[pos.st.hashKey] = alpha;
+    }
+    return alpha;
+}
+
+
+
+
+
 template<bool whiteToMove, bool castle>
 void Engine::moveIntegrity(Position& pos) {
     MoveList m;
@@ -235,6 +366,7 @@ void Engine::moveIntegrity(Position& pos) {
     for (int i = 0; i < m.size(); ++i) {
         doMove<whiteToMove, castle>(pos, m.moves[i]);
         undoMove<!whiteToMove, castle>(pos, m.moves[i]);
+        /*
         if (!(copy == pos)) {
             GUI::print_pieces(pos);
             GUI::parseMove(m.moves[i]);
@@ -244,6 +376,7 @@ void Engine::moveIntegrity(Position& pos) {
             std::cout << "Current: " << std::endl;
             GUI::print_bit_board(pos.teamBoards[2]);            
         }
+        */
     }
 }
 
@@ -313,7 +446,7 @@ void Engine::doMove(Position& pos, uint32_t move) {
                 constexpr uint8_t rookTo = whiteToMove ? 61 : 5;
                 newHash ^= _zobristHash->pieceHash[3][rookFrom] ^ _zobristHash->pieceHash[3][rookTo];
             }
-            else if (flags == CASTLE_QUEEN) {
+            else if (flags == Flags::CASTLE_QUEEN) {
                 doCastle<whiteToMove, false>(pos);
                 constexpr uint8_t rookFrom = whiteToMove ? 56 : 0;
                 constexpr uint8_t rookTo = whiteToMove ? 59 : 3;
@@ -359,23 +492,12 @@ void Engine::doMove(Position& pos, uint32_t move) {
     if constexpr (castle) {
 
         //Solve with pext and then switch case on the number maybe
-        const uint8_t beforeCnt = pos.st.castlingRights;
+        newHash ^= _zobristHash->castleHash[pos.st.castlingRights];
         //Handles if rook is captured or moves
         pos.st.castlingRights &= castlingModifiers[from];
         pos.st.castlingRights &= castlingModifiers[to];
 
-        //TODO: capture of rook needs to update castle hash
-        //Idea xor before and after => changed bits will be set to 1
-        switch (beforeCnt ^ pos.st.castlingRights) {
-        case 0b1100: newHash ^= _zobristHash->castleHash[3] ^ _zobristHash->castleHash[2]; break; //black king move
-        case 0b1000: newHash ^= _zobristHash->castleHash[3]; break; //black queen rook move
-        case 0b0100: newHash ^= _zobristHash->castleHash[2]; break; //black king rook move
-        case 0b0011: newHash ^= _zobristHash->castleHash[0] ^ _zobristHash->castleHash[1]; break; //white king move
-        case 0b0010: newHash ^= _zobristHash->castleHash[1]; break; //white queen rook move
-        case 0b0001: newHash ^= _zobristHash->castleHash[0]; break; //white king rook move
-        case 0b1010: newHash ^= _zobristHash->castleHash[1] ^ _zobristHash->castleHash[3]; break; //queen rooks capture other either way
-        case 0b0101: newHash ^= _zobristHash->castleHash[0] ^ _zobristHash->castleHash[2]; break; //king rooks capture other either way
-        }
+        newHash ^= _zobristHash->castleHash[pos.st.castlingRights];
     }
 
 
@@ -771,7 +893,6 @@ void Engine::tests()
 
             cout << "\nRunning test: " << testNr << endl;
             fenInit(pos, str);
-
             auto start = chrono::system_clock::now();
             uint64_t perftCount = pos.whiteToMove ? Engine::perft<true>(pos, perftLevel) : Engine::perft<false>(pos, perftLevel);
             auto end = chrono::system_clock::now();
@@ -781,6 +902,7 @@ void Engine::tests()
             cout << "KN/s: "
                 << static_cast<double>(perftCount) / elapsed_time.count() / 1000
                 << endl;
+            cout << "Perft depth: " << (int)perftLevel << endl;
 
             if (count != perftCount)
             {

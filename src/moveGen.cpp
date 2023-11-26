@@ -13,7 +13,7 @@ MoveGen::MoveGen() : magicalBits::MagicalBitboards() {
 template<bool whiteToMove, bool castling, bool pins, bool enPassant>
 const void MoveGen::generateMoves(const Position& pos, MoveList& move_list) const{
 
-	if (pos.st.numCheckers < 2) {
+	if (bitCount(pos.st.checkers) < 2) {
 		generatePawnMoves<whiteToMove, pins, enPassant>(pos, move_list);
 		generateKnightMoves<whiteToMove, pins>(pos, move_list);
 		generatePieceMoves<whiteToMove, Bishop, pins>(pos, move_list);
@@ -77,7 +77,7 @@ const void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list) 
 
 	}
 	const uint8_t king = pos.kings[!whiteToMove];
-	const uint64_t moves = kingLookUp[king] & moveableSquares<whiteToMove>(pos) & ~pos.st.enemyAttack;
+	const uint64_t moves = stepAttackBB<King>(king) & moveableSquares<whiteToMove>(pos) & ~pos.st.enemyAttack;
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
 
 	makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, king, CAPTURE | mover);
@@ -115,6 +115,10 @@ const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list) 
 	makePawnCapture<whiteToMove, pins, false>(pos, move_list, capLeft, backLeft, CAPTURE | pID);
 	makePawnCapture<whiteToMove, pins, false>(pos, move_list, capRight, backRight, CAPTURE | pID);
 
+
+	if constexpr (enPassant) {
+		enPassantMoves<whiteToMove, pins>(pos, move_list, pos.st.enPassant);
+	}
 	//Non promotion push
 	//TODO: when incheck the double push does't work
 
@@ -133,14 +137,9 @@ const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list) 
 		uint64_t push = shift<whiteToMove, UP>(promo) & nonOccupied & block;
 		uint64_t capLeft = shift<whiteToMove, UP_LEFT>(promo) & enemy & block;
 		uint64_t capRight = shift<whiteToMove, UP_RIGHT>(promo) & enemy & block;
-
-		makePawnMove<pins, true>(pos, move_list, push, back, PROMO_N | pID);
 		makePawnCapture<whiteToMove, pins, true>(pos, move_list, capLeft, backLeft, PROMO_NC | pID);
 		makePawnCapture<whiteToMove, pins, true>(pos, move_list, capRight, backRight, PROMO_NC | pID);
-	}
-
-	if constexpr (enPassant) {
-		enPassantMoves<whiteToMove, pins>(pos, move_list, pos.st.enPassant);
+		makePawnMove<pins, true>(pos, move_list, push, back, PROMO_N | pID);
 	}
 }
 
@@ -318,30 +317,40 @@ const void MoveGen::checks(Position& pos){
 	const uint64_t pawnCheck = pawnAttackBB<whiteToMove>(BB(king)) & getPieces<!whiteToMove, Pawn>(pos);
 
 	//Is either a knight or pawn, cannot be both so bool is no problem
-	pos.st.numCheckers += (const bool)(knightCheck | pawnCheck);
+	checkers |= knightCheck | pawnCheck;
 
 	pos.st.blockForKing |= knightCheck | pawnCheck;
 	//If there is no check then all squares should be available
 	const bool isBlock = pos.st.blockForKing;
 	pos.st.blockForKing |= !isBlock * All_SQ;
+	pos.st.checkers |= checkers;
+}
+
+template<bool whiteToMove>
+const void MoveGen::setCheckSquares(Position& pos) const{
+	const uint8_t enemyKing = pos.kings[!whiteToMove];
+	pos.checkSquares[0] = pawnAttackBB<!whiteToMove>(BB(enemyKing));
+	pos.checkSquares[1] = knightLookUp[enemyKing];
+	pos.checkSquares[2] = bishopAttack(pos.teamBoards[0], enemyKing);
+	pos.checkSquares[3] = rookAttack(pos.teamBoards[0], enemyKing);
 }
 
 
 /** @brief Finds pinned pieces and their corresponding pinned ray.
 *	It also finds checks given by sliders
+*	TODO: find blocker for king to detect discovered checks
 */
 template<bool whiteToMove>
 const void MoveGen::pinnedBoard(Position& pos){
-	uint64_t pinned = 0;
-	uint64_t blockForKing = 0;
-	uint8_t numCheckers = 0;
+	uint64_t pinned = 0ULL;
+	uint64_t blockForKing = 0ULL;
+	uint64_t checkers = 0ULL;
 	const uint8_t king = pos.kings[!whiteToMove];
 
-	uint64_t snipers = ((emptyAttack<Rook>(king) & (getPieces<!whiteToMove, Rook>(pos) | getPieces<!whiteToMove, Queen>(pos))) 
-					  | emptyAttack<Bishop>(king) & (getPieces<!whiteToMove, Bishop>(pos) | getPieces<!whiteToMove, Queen>(pos)));
+	uint64_t snipers = (emptyAttack<Rook>(king) & (getPieces<!whiteToMove, Rook>(pos) | getPieces<!whiteToMove, Queen>(pos))) 
+					  | (emptyAttack<Bishop>(king) & (getPieces<!whiteToMove, Bishop>(pos) | getPieces<!whiteToMove, Queen>(pos)));
 
 	const uint64_t occupancy = pos.teamBoards[0];
-	const uint64_t team = getTeam<whiteToMove>(pos);
 
 	unsigned long sq;
 	while (snipers) {
@@ -349,7 +358,7 @@ const void MoveGen::pinnedBoard(Position& pos){
 		bitScan(&sq, snipers);
 		snipers &= snipers - 1;
 
-		//Find squares between the pieces and the pieces
+		//Find squares between the pinner and the king
 		const uint64_t betweenSquares = betweenBB(sq, king);
 		const uint64_t betweenPieces = betweenSquares & occupancy;
 
@@ -357,7 +366,7 @@ const void MoveGen::pinnedBoard(Position& pos){
 		const int count = bitCount(betweenPieces);
 		if (count == 0) {
 			blockForKing |= betweenSquares | BB(sq);
-			numCheckers++;
+			checkers |= BB(sq);
 		}
 		else if (count == 1) {
 			pinned |= betweenSquares | BB(sq);
@@ -366,7 +375,7 @@ const void MoveGen::pinnedBoard(Position& pos){
 	//Update pos
 	pos.st.blockForKing = blockForKing;
 	pos.st.pinnedMask = pinned;
-	pos.st.numCheckers = numCheckers;
+	pos.st.checkers = checkers;
 }
 
 template<bool whiteToMove>
@@ -419,7 +428,10 @@ template const void MoveGen::generatePawnMoves<true, false, true>(const Position
 template const void MoveGen::generatePawnMoves<true, false, false>(const Position& pos, MoveList& move_list) const;
 
 
-//---------------------Attack lookups---------------------------------
+//////////////////////////////////////////////////////////////////
+////////////////// Attack lookups ////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
 template<Piece p>
 const uint64_t MoveGen::pieceAttack(uint64_t board, uint64_t pieces) const{
 	uint64_t attack = 0;
@@ -446,9 +458,6 @@ const uint64_t MoveGen::stepAttack(uint64_t pieces) const {
 
 
 
-
-
-
 template<Piece p>
 const inline uint64_t MoveGen::stepAttackBB(uint8_t square) const{
 	static_assert(p == Knight || p == King);
@@ -462,7 +471,7 @@ const inline uint64_t MoveGen::stepAttackBB(uint8_t square) const{
 
 template<Piece p>
 const inline uint64_t MoveGen::attackBB(uint64_t board, uint8_t square) const {
-	static_assert(p > 1);
+	//static_assert(p > 1);
 	if constexpr (p == Bishop) {
 		return bishopAttack(board, square);
 	}
@@ -489,6 +498,7 @@ const inline uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
 }
 
 
+template const uint64_t MoveGen::stepAttackBB<King>(uint8_t square) const;
 
 
 

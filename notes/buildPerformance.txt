@@ -37,3 +37,23 @@ Avg kN/s:
 1,029,550
 1,070,330 
 1,063,730
+
+
+Update visual studio
+Avg kN/s:
+1,103,520
+
+1.08577e+06
+
+
+Funny improvement: Removing the static assert in attackBB gave little speed up:
+Avg kN/s:
+1,100,840
+
+Without clearing transpositionTable in perft:
+Avg kN/s:
+1,143,250
+
+With robin_hood hash table instead of std
+Avg kN/s:
+1,353,720

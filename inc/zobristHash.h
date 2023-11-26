@@ -13,7 +13,7 @@ public:
 	uint64_t pieceHash[10][64];
 	uint64_t kingHash[2][64];
 	uint64_t epHash[8];
-	uint64_t castleHash[4];
+	uint64_t castleHash[16];
 	uint64_t whiteToMoveHash;
 	uint64_t moveHash;
 

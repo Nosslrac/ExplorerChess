@@ -1,5 +1,5 @@
 #include "../inc/GUI.h"
-
+#include <format>
 namespace GUI {
 	void print_bit_board(uint64_t b) {
 
@@ -40,7 +40,9 @@ namespace GUI {
 		}
 		std::cout << "   a   b   c   d   e   f   g   h\n\n";
 		getPositionFen(pos);
-		//std::cout << "\nHash key: " << pos.st.hashKey << "\n\n";
+		std::string checker = "";
+		GUI::getCheckers(checker, pos.st.checkers);
+		std::cout << "\nHash key: " << pos.st.hashKey << "\nChecker: " << checker << "\n\n";
 	}
 
 	//Initiates a piece array for display in cmd
@@ -109,13 +111,13 @@ namespace GUI {
 		}
 		sprintf_s(info, " %c %c%c%c%c %c%c 0 1", side, castle[0], castle[1], castle[2], castle[3], ep[0], ep[1]);
 		
-		std::cout << fen << info << "\n\n";
+		std::cout << fen << info;
 	}
 
 	void parseMove(uint32_t move) {
 		char from = getFrom(move);
 		char to = getTo(move);
-		MoveFlags flags = (MoveFlags)getFlags(move);
+		Flags flags = (Flags)getFlags(move);
 		char mover = getMover(move);
 
 		char capped = getCaptured(move);
@@ -139,16 +141,38 @@ namespace GUI {
 	}
 
 	void printMove(uint32_t move) {
+		std::string promo = "";
+		if (move & PROMO_N) {
+			switch (getPromo(move))
+			{
+			case 0: promo = "n"; break;
+			case 1: promo = "b"; break;
+			case 2: promo = "r"; break;
+			default: promo = "q"; break;
+			}
+		}
 		int from = getFrom(move);
 		int to = getTo(move);
 		std::cout << (char)(from % 8 + 'a') << (char)('8' - from / 8)
-			<< (char)('a' + to % 8) << (char)('8' - to / 8) << ": ";
+			<< (char)('a' + to % 8) << (char)('8' - to / 8) << promo;
 	}
 
 	void printState(StateInfo& st) {
 		char buff[150];
-		sprintf_s(buff, "Block: %llu, Pinned: %llu, Attack %llu, Checkers: %d, Castle: %d, Enpassant: %d", st.blockForKing, st.pinnedMask, st.enemyAttack, st.numCheckers, st.castlingRights, st.enPassant);
+
+		sprintf_s(buff, "Block: %llu, Pinned: %llu, Attack %llu, Checkers: %llu, Castle: %d, Enpassant: %d", st.blockForKing, st.pinnedMask, st.enemyAttack, st.checkers, st.castlingRights, st.enPassant);
 		std::cout << buff << std::endl;
+	}
+
+	void GUI::getCheckers(std::string& checkerSQ, uint64_t checkerBB) {
+		unsigned long sq;
+		while (checkerBB) {
+			bitScan(&sq, checkerBB);
+			checkerSQ += (char)(sq % 8 + 'a');
+			checkerSQ += (char)('8' - sq / 8);
+			checkerSQ += ' ';
+			checkerBB &= checkerBB - 1;
+		}
 	}
 
 	uint32_t findMove(MoveList& ml, std::string move) {

@@ -41,6 +41,8 @@ public:
 	const void checks(Position& pos);
 	template<bool whiteToMove>
 	const void findAttack(Position& pos);
+	template<bool whiteToMove>
+	const void setCheckSquares(Position& pos) const;
 
 private:
 
@@ -96,12 +98,12 @@ private:
 	}
 
 	template<bool white>
-	constexpr inline uint64_t getStraigthSliders(const Position& pos) const{
+	constexpr inline uint64_t getStraigthSliders(const Position& pos) const{ 
 		if constexpr (white) {
-			return pos.pieceBoards[4] | pos.pieceBoards[5];
+						return pos.pieceBoards[3] | pos.pieceBoards[4];
 		}
 		else {
-			return pos.pieceBoards[10] | pos.pieceBoards[11];
+			return pos.pieceBoards[8] | pos.pieceBoards[9];
 		}
 	}
 

@@ -24,10 +24,10 @@ void ZobristHash::initHash() {
         epHash[i] = distribute(generator);
     }
     //Castle hash and move hash
-    castleHash[0] = distribute(generator);
-    castleHash[1] = distribute(generator);
-    castleHash[2] = distribute(generator);
-    castleHash[3] = distribute(generator);
+    for (int i = 0; i < 16; i++) {
+        castleHash[i] = distribute(generator);
+    }
+    
     whiteToMoveHash = distribute(generator);
     moveHash = distribute(generator);
 }
@@ -52,11 +52,7 @@ uint64_t ZobristHash::hashPosition(const Position& pos) {
     posHash ^= kingHash[0][pos.kings[0]];
     posHash ^= kingHash[1][pos.kings[1]];
     
-    uint8_t castle = pos.st.castlingRights;
-    for (int i = 0; i < 4; ++i) {
-        posHash ^= (castle & 1) * castleHash[i];
-        castle >>= 1;
-    }
+    posHash ^= castleHash[pos.st.castlingRights];
 
     if (pos.st.enPassant) {
         const uint8_t file = pos.st.enPassant & 7;

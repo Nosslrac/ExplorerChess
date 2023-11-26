@@ -5,6 +5,7 @@
 
 #define bitCount(b) __popcnt64(b)
 #define bitScan(i, BB) _BitScanForward64(i, BB)
+#define pext(BB, mask) _pext_u64(BB, mask)
 
 #define getTo(move) (move & 0xFF)
 #define getFrom(move) ((move >> 8) & 0xFF)
@@ -33,7 +34,7 @@ enum Direction {
 	UP_RIGHT
 };
 
-enum MoveFlags {
+enum Flags {
 	QUIET = 0,
 	DOUBLE_PUSH = 0x10000,
 	CASTLE_KING = 0x20000,
@@ -71,6 +72,8 @@ constexpr uint64_t Rank8 = Rank1 << (8 * 7);
 
 constexpr uint8_t NoEP = 0;
 constexpr uint64_t All_SQ = ~0ULL;
+constexpr int CHECK_MATE = -0xFFFF;
+constexpr uint32_t CHECK_FLAG = 0x80;
 
 //---------CASTLING SQUARES--------------------------
 
@@ -92,11 +95,13 @@ struct StateInfo {
 	uint64_t blockForKing;
 	uint64_t pinnedMask;
 	uint64_t enemyAttack;
+	uint64_t checkers;
 
-	uint8_t numCheckers;
+	//uint8_t numCheckers;
 	uint8_t castlingRights;
 	uint8_t enPassant;
 
+	//Incremental
 	uint64_t hashKey;
 };
 
@@ -106,6 +111,10 @@ struct Position {
 	uint8_t kings[2];
 	uint64_t pieceBoards[10];
 	uint64_t teamBoards[3];
+
+	//Check boards
+	uint64_t checkSquares[4];
+
 
 	bool whiteToMove;
 	uint16_t ply;
@@ -126,6 +135,14 @@ struct MoveList {
 	}
 };
 
+struct Move {
+	int eval;
+	uint32_t move;
+	bool operator<(const Move& move) const{
+		return move.eval < eval;
+	}
+};
+
 
 template<bool white>
 const inline uint8_t getPiece(const uint64_t pieces[], uint8_t sq);
@@ -142,7 +159,23 @@ constexpr uint64_t shift(uint64_t b) {
 			D == UP_LEFT ? (b << 7) & ~FileH : (b << 9) & ~FileA;
 	}
 }
+//Squares infront of pawn
+template<bool white>
+constexpr inline uint64_t forwardSquares(uint8_t sq) {
+	if constexpr (white) {
+		return All_SQ >> ((8 - sq / 8) * 8);
+	}
+	else {
+		return All_SQ << ((sq / 8) * 8 + 8);
+	}
+}
 
+
+
+
+
+
+//Castling is blocked
 template<bool white, bool kingSide>
 constexpr bool isOccupied(uint64_t board) {
 	if constexpr (white) {
@@ -206,7 +239,7 @@ const uint64_t pinned_ray(int, int);
 constexpr uint64_t files[8] = { 0x0101010101010101ULL, 0x0202020202020202ULL, 0x0404040404040404ULL,
 	0x0808080808080808ULL, 0x1010101010101010ULL, 0x2020202020202020ULL, 0x4040404040404040ULL,
 	0x8080808080808080ULL };
-constexpr uint64_t ranks[8] = { 0xFFLL, 0xFF00LL, 0xFF0000LL, 0xFF000000LL, 0xFF00000000LL, 0xFF0000000000LL,
+constexpr int64_t ranks[8] = { 0xFFLL, 0xFF00LL, 0xFF0000LL, 0xFF000000LL, 0xFF00000000LL, 0xFF0000000000LL,
 		0xFF000000000000LL, 0xFF00000000000000LL };
 constexpr uint64_t main_diagonals[15] = { 0x0100000000000000ULL, 0x0201000000000000ULL, 0x0402010000000000ULL, 0x0804020100000000ULL,
 		0x1008040201000000ULL, 0x2010080402010000ULL, 0x4020100804020100ULL, 0x8040201008040201ULL,
@@ -214,3 +247,7 @@ constexpr uint64_t main_diagonals[15] = { 0x0100000000000000ULL, 0x0201000000000
 constexpr uint64_t anti_diagonals[15] = { 0x1ULL, 0x0102ULL, 0x010204ULL, 0x01020408ULL, 0x0102040810ULL, 0x010204081020ULL, 0x01020408102040ULL,
 		0x0102040810204080ULL, 0x0204081020408000ULL, 0x0408102040800000ULL, 0x0810204080000000ULL, 0x1020408000000000ULL,
 		0x2040800000000000ULL, 0x4080000000000000ULL, 0x8000000000000000ULL };
+
+constexpr uint64_t adjacentFiles[8] = {files[0] | files[1], files[0] | files[1] | files[2], files[1] | files[2] | files[3], 
+										files[2] | files[3] | files[4], files[3] | files[4] | files[5], files[4] | files[5] | files[6], 
+										files[5] | files[6] | files[7], files[6] | files[7]};

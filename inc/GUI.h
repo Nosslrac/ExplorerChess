@@ -37,6 +37,8 @@ namespace GUI{
 
 	void printState(StateInfo& st);
 
+	void getCheckers(std::string& checkerSQ, uint64_t checkerBB);
+
 	uint32_t findMove(MoveList& ml, std::string move);
 }
 

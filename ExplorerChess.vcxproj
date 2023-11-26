@@ -48,7 +48,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>ClangCL</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -150,17 +150,22 @@
     <ClCompile Include="src\attacks.cpp" />
     <ClCompile Include="src\bitboardUtil.cpp" />
     <ClCompile Include="src\Engine.cpp" />
+    <ClCompile Include="src\evaluate.cpp" />
     <ClCompile Include="src\ExplorerChess.cpp" />
     <ClCompile Include="src\GUI.cpp" />
     <ClCompile Include="src\moveGen.cpp" />
+    <ClCompile Include="src\moveOrdering.cpp" />
     <ClCompile Include="src\zobristHash.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inc\attacks.h" />
     <ClInclude Include="inc\bitboardUtil.h" />
     <ClInclude Include="inc\Engine.h" />
+    <ClInclude Include="inc\evaluate.h" />
     <ClInclude Include="inc\GUI.h" />
     <ClInclude Include="inc\moveGen.h" />
+    <ClInclude Include="inc\moveOrdering.h" />
+    <ClInclude Include="inc\robin_hood.h" />
     <ClInclude Include="inc\zobristHash.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
