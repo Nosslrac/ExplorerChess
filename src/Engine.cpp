@@ -1,6 +1,6 @@
 #include "../inc/Engine.h"
 
-//#define PRINT_OUT
+#define PRINT_OUT
 
 #define SHALLOW_SEARCH
 
@@ -52,12 +52,23 @@ void Engine::runUI() {
             std::string arg2 = userInput.substr(commandEnd2 + 1);
             fenInit(_pos, arg2);
         }
+        else {
+            fenInit(_pos, "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
+        }
 
 	}
     else if (strcmp(command.c_str(), "test") == 0) {
         tests();
     }
     else if (strcmp(command.c_str(), "analyse") == 0) {
+        /*int eval = 0;
+        if (_pos.whiteToMove) eval = _evaluation->evaluate<true>(_pos);
+        else eval = _evaluation->evaluate<false>(_pos);
+        
+            
+        std::cout << "Score: " << eval << std::endl;*/
+
+        
         Move move;
         const int depth = std::stoi(arg);
         if (_pos.whiteToMove) {
@@ -260,7 +271,7 @@ uint64_t Engine::search(Position& pos, int depth) {
 
 template<bool whiteToMove>
 Move Engine::analysis(Position& pos, int depth) {
-    //_bestMoves = std::priority_queue<Move, std::vector<Move>>();
+    _evalTransposition.clear();
     MoveList move_list;
     const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
     nodes = 0;
@@ -270,7 +281,7 @@ Move Engine::analysis(Position& pos, int depth) {
     if (castle) {
         for (int i = 0; i < move_list.size(); ++i) {
             doMove<whiteToMove, true>(pos, move_list.moves[i]);
-            const int eval = -negaMax<!whiteToMove, true>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            const int eval = -negaMax<!whiteToMove, true>(pos, CHECK_MATE, -CHECK_MATE, depth);
             if (eval > bestMove.eval) {
                 bestMove = { eval, move_list.moves[i] };
             }
@@ -280,16 +291,12 @@ Move Engine::analysis(Position& pos, int depth) {
     else {
         for (int i = 0; i < move_list.size(); ++i) {
             doMove<whiteToMove, false>(pos, move_list.moves[i]);
-            const int eval = -negaMax<!whiteToMove, false>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            const int eval = -negaMax<!whiteToMove, false>(pos, CHECK_MATE, -CHECK_MATE, depth);
             if (eval > bestMove.eval) {
                 bestMove = { eval, move_list.moves[i] };
             }
             undoMove<!whiteToMove, false>(pos, move_list.moves[i]);
         }
-    }
-    _evalTransposition.clear();
-    if constexpr (!whiteToMove) {
-        bestMove.eval = -bestMove.eval;
     }
     return bestMove;
 }
@@ -298,7 +305,7 @@ template<bool whiteToMove, bool castle>
 int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
     //Negamax with alpha beta pruning
     nodes++;
-    if (_evalTransposition.find(pos.st.hashKey) != _evalTransposition.end()) {
+    if (_evalTransposition.contains(pos.st.hashKey)) {
         return _evalTransposition.at(pos.st.hashKey);
     }
     
@@ -307,6 +314,7 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
     }
 
     MoveList move_list;
+
     const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
 
     if (move_list.size() == 0) {
@@ -327,11 +335,9 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
                 if (eval >= beta) {
                     return beta;
                 }
-                if(eval > alpha) {
-                    alpha = eval;
-                }
                 
             }
+            _evalTransposition[pos.st.hashKey] = alpha;
             return alpha;
         }
 
@@ -343,14 +349,9 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
         if (eval >= beta) {
             return beta;
         }
-        if (eval > alpha) {
-            alpha = eval;
-        }
-
+        alpha = std::max(alpha, eval);
     }
-    if (depth > 1) {
-        _evalTransposition[pos.st.hashKey] = alpha;
-    }
+    _evalTransposition[pos.st.hashKey] = alpha;
     return alpha;
 }
 

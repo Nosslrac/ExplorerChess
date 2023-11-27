@@ -6,12 +6,13 @@ void MoveOrder::moveSort(MoveList& move_list, const Position& pos, int depth){
 }
 
 void MoveOrder::captureSort(MoveList& move_list) {
-    uint32_t move, j;
+    uint32_t move;
+    int j;
     for (int i = 1; i < move_list.size(); ++i) {
         move = move_list.moves[i];
         j = i - 1;
 
-        while (j >= 0 && captureScore(move_list.moves[j], move)) {
+        while (j >= 0 && captureScore(move, move_list.moves[j])) {
             move_list.moves[j + 1] = move_list.moves[j];
             j--;
         }

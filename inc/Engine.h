@@ -79,4 +79,7 @@ private:
 
 	//Evaluation transposition
 	robin_hood::unordered_flat_map<uint64_t, int> _evalTransposition;
+
+
+	MoveList moveListArena[20];
 };
