@@ -39,7 +39,7 @@ namespace GUI{
 
 	void getCheckers(std::string& checkerSQ, uint64_t checkerBB);
 
-	uint32_t findMove(MoveList& ml, std::string move);
+	uint32_t findMove(MoveList& ml, std::string move) noexcept;
 }
 
 

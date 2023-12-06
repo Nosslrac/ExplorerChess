@@ -1,3 +1,22 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//         ____________                                                                                                       ////
+//        /           /_____     _____      _________  ____         ___________    _________    _________    _________       ////
+//       /     ______/ \    \   /    /     /  ___   / /   /        /          /   /  ___   /   /  ______/   /  ___   /      // //
+//      /     /____     \    \_/    /     /  /  /  / /   /        /   ____   /   /  /  /  /   /  /____     /  /  /  /      //  //
+//     /     _____/      \         /     /  /__/  / /   /        /   /   /  /   /  /__/ _/   /   ___/     /  /__/ _/      //   //
+//    /     /______      /    _    \    /    ____/ /   /        /   /___/  /   /   _   /    /   /______  /   _   /       //    //
+//   /            /     /    / \    \  /    /     /   /______  /          /   /   / \   \  /          / /   / \   \     //     //
+//  /____________/     /____/   \____\/____/     /__________/ /__________/   /___/   \___\/__________/ /___/   \___\   //      //
+//                                                                                                                    //       //
+//        ____________                                                                                               //        //
+//       /          /   _____   ____  _________  __________   __________                                            //         //
+//      /     _____/   /    /  /   / /  ______/ /   ______/  /   ______/                                           //          //
+//     /     /        /    /__/   / /  /____    \__  \       \__  \                                               //           //
+//    /     /        /           / /   ___/        \  \         \  \                                             //            //
+//   /     /______  /    ___    / /   /______   ___/   \     ___/   \                                           //             //
+//  /            / /    /  /   / /          /  /       /    /       /                                          //              //
+// /____________/ /____/  /___/ /__________/   \______/     \______/                                          //               //
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include "../inc/Engine.h"
 
 #define PRINT_OUT
@@ -78,14 +97,14 @@ void Engine::runUI() {
             move = analysis<false>(_pos, depth);
         }
         GUI::printMove(move.move);
-        std::cout << "\nNodes searched: " << nodes << "\nEval: " << move.eval << std::endl;
+        std::cout << "\nNodes searched: " << nodes << "\nQnodes searched:" << qNodes << "\nEval: " << move.eval << std::endl;
     }
     else if (strcmp(command.c_str(), "hashTest") == 0) {
         MoveList ml;
         if (_pos.whiteToMove)
-            _moveGen->generateAllMoves<true>(_pos, ml);
+            _moveGen->generateAllMoves<true>(_pos, ml, false);
         else
-            _moveGen->generateAllMoves<false>(_pos, ml);
+            _moveGen->generateAllMoves<false>(_pos, ml, false);
 
         for (int i = 0; i < ml.size(); ++i) {
             if (_pos.whiteToMove) {
@@ -114,7 +133,13 @@ void Engine::runUI() {
         GUI::print_pieces(_pos);
     }
     else if (strcmp(command.c_str(), "g") == 0) {
-        GUI::print_bit_board(_pos.st.pinnedMask);
+        MoveList ml;
+        _moveGen->generateAllMoves<true>(_pos, ml, true);
+        int i = 0;
+        while (ml.moves[i++]) {
+            GUI::printMove(ml.moves[i]);
+            std::cout << std::endl;
+        }
     }
     else if (strcmp(command.c_str(), "state") == 0) {
         GUI::printState(_pos.st);
@@ -122,27 +147,33 @@ void Engine::runUI() {
     else if (strcmp(command.c_str(), "make") == 0) {
         MoveList ml;
         if (_pos.whiteToMove) {
-            _moveGen->generateAllMoves<true>(_pos, ml);
+            _moveGen->generateAllMoves<true>(_pos, ml, false);
             const uint32_t move = GUI::findMove(ml, arg);
-            prevMoves.push(move);
-            doMove<true, true>(_pos, move);
+            if (move != 0) {
+                prevMoves.push(move);
+                doMove<true, true>(_pos, move);
+            }
         }
         else {
-            _moveGen->generateAllMoves<false>(_pos, ml);
+            _moveGen->generateAllMoves<false>(_pos, ml, false);
             const uint32_t move = GUI::findMove(ml, arg);
-            prevMoves.push(move);
-            doMove<false, true>(_pos, move);
+            if (move != 0) {
+                prevMoves.push(move);
+                doMove<false, true>(_pos, move);
+            }
         }
         
     }
     else if (strcmp(command.c_str(), "unmake") == 0) {
-        uint32_t move  = prevMoves.top();
-        prevMoves.pop();
-        if (_pos.whiteToMove) {
-            undoMove<true, true>(_pos, move);
-        }
-        else {
-            undoMove<false, true>(_pos, move);
+        if (!prevMoves.empty()) {
+            uint32_t move = prevMoves.top();
+            prevMoves.pop();
+            if (_pos.whiteToMove) {
+                undoMove<true, true>(_pos, move);
+            }
+            else {
+                undoMove<false, true>(_pos, move);
+            }
         }
     }
     else if (strcmp(command.c_str(), "perft") == 0) {
@@ -153,6 +184,15 @@ void Engine::runUI() {
         else {
             perft<false>(_pos, depth);
         } 
+    }
+    else if (strcmp(command.c_str(), "help") == 0) {
+        std::cout << "Available commands:\n"
+            << "position: Set position. Usage: position startpos or position fen <fenstring>.\n"
+            << "perft: Count number of possible positions at certain given depth for a position.\n"
+            << "make: Makes specified move. Does nothing if move is illegal.\n"
+            << "unmake: Unmakes last made move.\n"
+            << "d: display current position.\n"
+            << "analyse: Analyse position at certain given depth\n";
     }
     else {
         std::cout << "Command not found\n";
@@ -166,7 +206,7 @@ void Engine::runUI() {
 template<bool whiteToMove>
 uint64_t Engine::perft(Position& pos, int depth) {
     MoveList move_list;
-    const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+    const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list, false);
     nodes = 0;
 
 #ifndef SHALLOW_SEARCH
@@ -211,20 +251,20 @@ uint64_t Engine::perft(Position& pos, int depth) {
 #ifdef PRINT_OUT
     std::cout << "Total positions: " << numPositions << "\nNodes searched: " << nodes << std::endl;
 #endif
-    _transpositionTable.clear();
+    //_transpositionTable.clear();
     return numPositions;
 }
 
 template<bool whiteToMove, bool castle>
 uint64_t Engine::search(Position& pos, int depth) {
     nodes++;
-    if (_transpositionTable.contains(pos.st.hashKey)) {
-        return _transpositionTable.at(pos.st.hashKey);
-    }
+    //if (_transpositionTable.contains(pos.st.hashKey)) {
+      //  return _transpositionTable.at(pos.st.hashKey);
+    //}
 
 #ifdef SHALLOW_SEARCH
     MoveList move_list;
-    const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+    const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list, false);
     if (depth > 1) {
         uint64_t numPositions = 0;
         if constexpr (castle) {
@@ -243,7 +283,7 @@ uint64_t Engine::search(Position& pos, int depth) {
             numPositions += search<!whiteToMove, false>(pos, depth - 1);
             undoMove<!whiteToMove, false>(pos, move_list.moves[i]);
         }
-        _transpositionTable[pos.st.hashKey] = numPositions;
+        //_transpositionTable[pos.st.hashKey] = numPositions;
         return numPositions;
     }
     return move_list.size();
@@ -273,15 +313,18 @@ template<bool whiteToMove>
 Move Engine::analysis(Position& pos, int depth) {
     _evalTransposition.clear();
     MoveList move_list;
-    const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+    const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list, false);
+    MoveOrder::moveSort(move_list, pos, depth);
     nodes = 0;
+    qNodes = 0;
     Move bestMove = { CHECK_MATE, move_list.moves[0]}; //Initiate first move with worst possible eval
-
-    
+   
     if (castle) {
         for (int i = 0; i < move_list.size(); ++i) {
             doMove<whiteToMove, true>(pos, move_list.moves[i]);
-            const int eval = -negaMax<!whiteToMove, true>(pos, CHECK_MATE, -CHECK_MATE, depth);
+            const int eval = -negaMax<!whiteToMove, true>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            GUI::printMove(move_list.moves[i]);
+            std::cout << " => Eval: " << eval << std::endl;
             if (eval > bestMove.eval) {
                 bestMove = { eval, move_list.moves[i] };
             }
@@ -291,7 +334,9 @@ Move Engine::analysis(Position& pos, int depth) {
     else {
         for (int i = 0; i < move_list.size(); ++i) {
             doMove<whiteToMove, false>(pos, move_list.moves[i]);
-            const int eval = -negaMax<!whiteToMove, false>(pos, CHECK_MATE, -CHECK_MATE, depth);
+            const int eval = -negaMax<!whiteToMove, false>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            GUI::printMove(move_list.moves[i]);
+            std::cout << " => Eval: " << eval << std::endl;
             if (eval > bestMove.eval) {
                 bestMove = { eval, move_list.moves[i] };
             }
@@ -305,17 +350,18 @@ template<bool whiteToMove, bool castle>
 int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
     //Negamax with alpha beta pruning
     nodes++;
-    if (_evalTransposition.contains(pos.st.hashKey)) {
-        return _evalTransposition.at(pos.st.hashKey);
-    }
-    
     if (depth == 0) {
-        return _evaluation->evaluate<whiteToMove>(pos);
+        return qSearch<whiteToMove, castle>(pos, alpha, beta);
+        //return _evaluation->evaluate<whiteToMove>(pos);
     }
 
+    //if (_evalTransposition.contains(pos.st.hashKey)) {
+      //  return _evalTransposition.at(pos.st.hashKey);
+    //}
+    
     MoveList move_list;
 
-    const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+    const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list, false);
 
     if (move_list.size() == 0) {
         if (pos.st.checkers) {
@@ -335,9 +381,10 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
                 if (eval >= beta) {
                     return beta;
                 }
+                alpha = std::max(eval, alpha);
                 
             }
-            _evalTransposition[pos.st.hashKey] = alpha;
+            //_evalTransposition[pos.st.hashKey] = alpha;
             return alpha;
         }
 
@@ -351,18 +398,37 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
         }
         alpha = std::max(alpha, eval);
     }
-    _evalTransposition[pos.st.hashKey] = alpha;
+    //_evalTransposition[pos.st.hashKey] = alpha;
     return alpha;
 }
 
 
+template<bool whiteToMove>
+int Engine::qSearch(Position& pos, int alpha, int beta) {
+    qNodes++;
+    MoveList moveList;
+    _moveGen->generateAllMoves<whiteToMove>(pos, moveList, true);
+    if (moveList.size() == 0) {
+        return _evaluation->evaluate<whiteToMove>(pos);
+    }
 
+    for (int i = 0; i < moveList.size(); ++i) {
+        doMove<whiteToMove, false>(pos, moveList.moves[i]);
+        const int eval = -qSearch<!whiteToMove>(pos, -beta, -alpha);
+        undoMove<!whiteToMove, false>(pos, moveList.moves[i]);
+        if (eval >= beta) {
+            return beta;
+        }
+        alpha = std::max(alpha, eval);
+    }
+    return alpha;
+}
 
 
 template<bool whiteToMove, bool castle>
 void Engine::moveIntegrity(Position& pos) {
     MoveList m;
-    _moveGen->generateAllMoves<whiteToMove>(pos, m);
+    _moveGen->generateAllMoves<whiteToMove>(pos, m, false);
     Position copy = pos;
     for (int i = 0; i < m.size(); ++i) {
         doMove<whiteToMove, castle>(pos, m.moves[i]);
@@ -517,6 +583,7 @@ void Engine::doMove(Position& pos, uint32_t move) {
     _moveGen->findAttack<!whiteToMove>(pos);
     _moveGen->pinnedBoard<!whiteToMove>(pos);
     _moveGen->checks<!whiteToMove>(pos);
+    _moveGen->setCheckSquares<!whiteToMove>(pos);
 }
 
 //Check list for undo move

@@ -55,6 +55,8 @@ private:
 	template<bool whiteToMove, bool castle>
 	int negaMax(Position& pos, int alpha, int beta, int depth);
 
+	template<bool whiteToMove>
+	int qSearch(Position& pos, int alpha, int beta);
 
 	//Build validation
 	void tests();
@@ -64,6 +66,7 @@ private:
 	MoveGen* _moveGen;
 	ZobristHash* _zobristHash;
 	uint64_t nodes;
+	uint64_t qNodes;
 	Evaluation* _evaluation;
 	
 	

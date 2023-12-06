@@ -8,25 +8,22 @@ class MoveGen : private magicalBits::MagicalBitboards{
 public:
 	MoveGen();
 	template<bool whiteToMove>
-	const bool generateAllMoves(const Position& pos, MoveList& move_list) const;
+	const bool generateAllMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool castling, bool pins, bool enPassant>
-	const void generateMoves(const Position& pos, MoveList& move_list) const;
+	const void generateMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool castling>
-	const void generateKingMoves(const Position& pos, MoveList& move_list) const;
+	const void generateKingMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool pins, bool enPassent>
-	const void generatePawnMoves(const Position& pos, MoveList& move_list) const;
+	const void generatePawnMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool pins>
-	const void generateKnightMoves(const Position& pos, MoveList& move_list) const;
+	const void generateKnightMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 	
 	template<bool whiteToMove, Piece p, bool pins>
-	const void generatePieceMoves(const Position& pos, MoveList& move_list) const;
-
-	void getBishopMoves(MoveList& moves, uint64_t bishops);
-	void getRookMoves(MoveList& moves, uint64_t rooks);
+	const void generatePieceMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	//Move to private when working
 	template<Piece p>

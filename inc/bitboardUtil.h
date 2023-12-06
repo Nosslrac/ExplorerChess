@@ -149,7 +149,7 @@ const inline uint8_t getPiece(const uint64_t pieces[], uint8_t sq);
 
 
 template<bool whiteToMove, Direction D>
-constexpr uint64_t shift(uint64_t b) {
+uint64_t shift(uint64_t b) {
 	if constexpr (whiteToMove) {
 		return D == UP ? b >> 8 : D == DOWN ? b << 8 :
 			D == UP_LEFT ? (b >> 9) & ~FileH : (b >> 7) & ~FileA;
@@ -161,7 +161,7 @@ constexpr uint64_t shift(uint64_t b) {
 }
 //Squares infront of pawn
 template<bool white>
-constexpr inline uint64_t forwardSquares(uint8_t sq) {
+inline uint64_t forwardSquares(uint8_t sq) {
 	if constexpr (white) {
 		return All_SQ >> ((8 - sq / 8) * 8);
 	}
@@ -177,7 +177,7 @@ constexpr inline uint64_t forwardSquares(uint8_t sq) {
 
 //Castling is blocked
 template<bool white, bool kingSide>
-constexpr bool isOccupied(uint64_t board) {
+bool isOccupied(uint64_t board) {
 	if constexpr (white) {
 		return kingSide ? WHITE_KING_PIECES & board : WHITE_QUEEN_PIECES & board;
 	}
@@ -188,7 +188,7 @@ constexpr bool isOccupied(uint64_t board) {
 
 
 template<bool white, bool kingSide>
-constexpr bool isAttacked(uint64_t attack) {
+bool isAttacked(uint64_t attack) {
 	if constexpr (white) {
 		return kingSide ? WHITE_KING_PIECES & attack : WHITE_ATTACK_QUEEN & attack;
 	}
@@ -200,13 +200,13 @@ constexpr bool isAttacked(uint64_t attack) {
 
 //Return possible ep capturers
 template<bool whiteToMove>
-constexpr inline uint64_t EPpawns(const Position& pos) {
-	if constexpr (whiteToMove) return Rank4 & pos.pieceBoards[1];
-	return Rank5 & pos.pieceBoards[7];
+inline uint64_t EPpawns(const Position& pos) {
+	if constexpr (whiteToMove) return Rank4 & pos.pieceBoards[0];
+	return Rank5 & pos.pieceBoards[5];
 }
 
 
-constexpr inline bool moreThanOne(uint64_t b) {
+inline bool moreThanOne(uint64_t b) {
 	return b & (b - 1);
 }
 

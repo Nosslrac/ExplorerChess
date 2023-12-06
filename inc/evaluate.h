@@ -15,6 +15,7 @@ private:
 	const uint16_t pieceValue[5] = {100, 300, 300, 500, 900};
 
 	//Material balance
+	template<bool whiteToMove>
 	const int staticPieceEvaluation(const uint64_t piece[10]) const;
 
 

@@ -13,17 +13,18 @@ const int Evaluation::evaluate(const Position& pos) const {
 	const int safety = Evaluation::kingSafety<whiteToMove>(pos);
 	const int passedPawn = Evaluation::passedPawns<whiteToMove>(pos.pieceBoards);
 	const int material = staticPieceEvaluation<whiteToMove>(pos.pieceBoards);
-	return (safety + material);
+	return material;
 }
 
 
-
+template<bool whiteToMove>
 const int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const{
 	int diff = 0;
 	for (int i = 0; i < 5; ++i) {
 		diff += (bitCount(pieces[i]) - bitCount(pieces[i + 5])) * pieceValue[i];
 	}
-	return diff;
+	constexpr int flip = whiteToMove ? 1 : -1;
+	return diff * flip;
 }
 
 

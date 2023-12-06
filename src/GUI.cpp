@@ -175,7 +175,7 @@ namespace GUI {
 		}
 	}
 
-	uint32_t findMove(MoveList& ml, std::string move) {
+	uint32_t findMove(MoveList& ml, std::string move) noexcept {
 		int from = (move.at(0) - 'a') + (8 - move.at(1) + '0') * 8;
 		int to = (move.at(2) - 'a') + (8 - move.at(3) + '0') * 8;
 
