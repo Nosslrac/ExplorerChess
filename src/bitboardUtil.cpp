@@ -1,12 +1,6 @@
 #include "../inc/bitboardUtil.h"
 
 
-//TODO:testing if casting to uint8_t makes a difference
-const uint8_t long_bit_scan(uint64_t i){
-	unsigned long r;
-	_BitScanForward64(&r, i);
-	return (uint8_t)r;
-}
 
 
 /*

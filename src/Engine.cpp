@@ -18,8 +18,10 @@
 // /____________/ /____/  /___/ /__________/   \______/     \______/                                          //               //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include "../inc/Engine.h"
+#include "../inc/attackPext.h"
+#include <cmath>
 
-#define PRINT_OUT
+//#define PRINT_OUT
 
 #define SHALLOW_SEARCH
 
@@ -72,7 +74,7 @@ void Engine::runUI() {
             fenInit(_pos, arg2);
         }
         else {
-            fenInit(_pos, "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
+            fenInit(_pos, "7k/3n4/n1B5/3B1K2/8/1n2B3/8/8 w - - 0 1");
         }
 
 	}
@@ -133,12 +135,22 @@ void Engine::runUI() {
         GUI::print_pieces(_pos);
     }
     else if (strcmp(command.c_str(), "g") == 0) {
-        MoveList ml;
-        _moveGen->generateAllMoves<true>(_pos, ml, true);
-        int i = 0;
-        while (ml.moves[i++]) {
-            GUI::printMove(ml.moves[i]);
-            std::cout << std::endl;
+        // MoveList ml;
+        // _moveGen->generateAllMoves<true>(_pos, ml, true);
+        // int i = 0;
+        // while (ml.moves[i++]) {
+        //     GUI::printMove(ml.moves[i]);
+        //     std::cout << std::endl;
+        // }
+    }
+    else if(strcmp(command.c_str(), "bishop") == 0){
+        uint64_t bs = _pos.pieceBoards[2];
+        while(bs){
+            int x = bitScan(bs);
+            bs &= bs - 1;
+            uint64_t attack = _moveGen->attackBB<Bishop>(_pos.teamBoards[0], x);
+            GUI::print_bit_board(attack);
+            GUI::print_pieces(_pos);
         }
     }
     else if (strcmp(command.c_str(), "state") == 0) {
@@ -351,7 +363,7 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
     //Negamax with alpha beta pruning
     nodes++;
     if (depth == 0) {
-        return qSearch<whiteToMove, castle>(pos, alpha, beta);
+        return qSearch<whiteToMove>(pos, alpha, beta);
         //return _evaluation->evaluate<whiteToMove>(pos);
     }
 

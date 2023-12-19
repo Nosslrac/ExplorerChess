@@ -1,10 +1,11 @@
 #pragma once
-#include <intrin.h>
+#include <x86intrin.h>
 #include <cinttypes>
 #include <iostream>
+#include <string.h>
 
-#define bitCount(b) __popcnt64(b)
-#define bitScan(i, BB) _BitScanForward64(i, BB)
+#define bitCount(b) __builtin_popcountll(b)
+#define bitScan(BB) __builtin_ctzll(BB)
 #define pext(BB, mask) _pext_u64(BB, mask)
 
 #define getTo(move) (move & 0xFF)
@@ -239,7 +240,7 @@ const uint64_t pinned_ray(int, int);
 constexpr uint64_t files[8] = { 0x0101010101010101ULL, 0x0202020202020202ULL, 0x0404040404040404ULL,
 	0x0808080808080808ULL, 0x1010101010101010ULL, 0x2020202020202020ULL, 0x4040404040404040ULL,
 	0x8080808080808080ULL };
-constexpr int64_t ranks[8] = { 0xFFLL, 0xFF00LL, 0xFF0000LL, 0xFF000000LL, 0xFF00000000LL, 0xFF0000000000LL,
+constexpr uint64_t ranks[8] = { 0xFFLL, 0xFF00LL, 0xFF0000LL, 0xFF000000LL, 0xFF00000000LL, 0xFF0000000000LL,
 		0xFF000000000000LL, 0xFF00000000000000LL };
 constexpr uint64_t main_diagonals[15] = { 0x0100000000000000ULL, 0x0201000000000000ULL, 0x0402010000000000ULL, 0x0804020100000000ULL,
 		0x1008040201000000ULL, 0x2010080402010000ULL, 0x4020100804020100ULL, 0x8040201008040201ULL,

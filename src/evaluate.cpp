@@ -65,7 +65,7 @@ const int Evaluation::passedPawns(const uint64_t piece[10]) const {
 	int score = 0;
 	unsigned long sq;
 	while (pawns) {
-		bitScan(&sq, pawns);
+		sq = bitScan(pawns);
 		const uint64_t forwardSQ = adjacentFiles[sq & 7] & forwardSquares<whiteToMove>(sq);
 		if (forwardSQ & enemyPawns) { //Passer
 			score += 10;

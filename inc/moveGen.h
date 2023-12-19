@@ -1,10 +1,11 @@
 #pragma once
 #include "attacks.h"
 #include "bitboardUtil.h"
+#include "attackPext.h"
 
 
 
-class MoveGen : private magicalBits::MagicalBitboards{
+class MoveGen : PEXT_ATTACK::PextAttack{
 public:
 	MoveGen();
 	template<bool whiteToMove>
@@ -48,8 +49,8 @@ private:
 	template<Piece p>
 	const uint64_t stepAttack(uint64_t pieces) const;
 
-	const inline uint64_t bishopAttack(uint64_t board, uint8_t square) const;
-	const inline uint64_t rookAttack(uint64_t board, uint8_t square) const;
+	inline const uint64_t bishopAttack(uint64_t board, uint8_t square) const;
+	inline const uint64_t rookAttack(uint64_t board, uint8_t square) const;
 
 	template<bool isPromotion>
 	const inline void constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPiece) const;
@@ -120,10 +121,10 @@ private:
 	template<Piece p>
 	const inline uint64_t emptyAttack(uint8_t sq) const{
 		if constexpr (p == Bishop) {
-			return m_bishopAttacks[sq][0];
+			return attackBB<Bishop>(0, sq);
 		}
 		if constexpr (p == Rook) {
-			return m_rookAttacks[sq][0];
+			return attackBB<Rook>(0, sq);
 		}
 	}
 

@@ -1,5 +1,4 @@
 #include "../inc/GUI.h"
-#include <format>
 namespace GUI {
 	void print_bit_board(uint64_t b) {
 
@@ -52,7 +51,7 @@ namespace GUI {
 			uint64_t pieces = pos.pieceBoards[i];
 			unsigned long sq;
 			while (pieces) {
-				bitScan(&sq, pieces);
+				sq = bitScan(pieces);
 				pBoard[sq] = fenRepresentation[i];
 				pieces &= pieces - 1;
 			}
@@ -109,7 +108,7 @@ namespace GUI {
 			ep[0] = file;
 			ep[1] = rank;
 		}
-		sprintf_s(info, " %c %c%c%c%c %c%c 0 1", side, castle[0], castle[1], castle[2], castle[3], ep[0], ep[1]);
+		printf(info, " %c %c%c%c%c %c%c 0 1", side, castle[0], castle[1], castle[2], castle[3], ep[0], ep[1]);
 		
 		std::cout << fen << info;
 	}
@@ -134,7 +133,7 @@ namespace GUI {
 			break;
 		}
 		char buff[100];
-		sprintf_s(buff, "From: %d, To: %d, Mover: %d, Captured: %d, ", from, to, mover, capped);
+		printf(buff, "From: %d, To: %d, Mover: %d, Captured: %d, ", from, to, mover, capped);
 		std::cout << buff << "Flags: " + fString << std::endl;
 
 		GUI::print_bit_board(BB(from) | BB(to));
@@ -160,14 +159,14 @@ namespace GUI {
 	void printState(StateInfo& st) {
 		char buff[150];
 
-		sprintf_s(buff, "Block: %llu, Pinned: %llu, Attack %llu, Checkers: %llu, Castle: %d, Enpassant: %d", st.blockForKing, st.pinnedMask, st.enemyAttack, st.checkers, st.castlingRights, st.enPassant);
+		printf(buff, "Block: %llu, Pinned: %llu, Attack %llu, Checkers: %llu, Castle: %d, Enpassant: %d", st.blockForKing, st.pinnedMask, st.enemyAttack, st.checkers, st.castlingRights, st.enPassant);
 		std::cout << buff << std::endl;
 	}
 
-	void GUI::getCheckers(std::string& checkerSQ, uint64_t checkerBB) {
+	void getCheckers(std::string& checkerSQ, uint64_t checkerBB) {
 		unsigned long sq;
 		while (checkerBB) {
-			bitScan(&sq, checkerBB);
+			sq = bitScan(checkerBB);
 			checkerSQ += (char)(sq % 8 + 'a');
 			checkerSQ += (char)('8' - sq / 8);
 			checkerSQ += ' ';

@@ -5,7 +5,7 @@ void ZobristHash::initHash() {
     std::random_device os_seed;
     const uint32_t seed = os_seed();
     std::mt19937 generator(seed);
-    std::uniform_int_distribution< uint64_t > distribute(0, LLONG_MAX);
+    std::uniform_int_distribution< uint64_t > distribute(0, UINT64_MAX);
 
     //Init piece hash
     for (int i = 0; i < 10; i++) {
@@ -43,7 +43,7 @@ uint64_t ZobristHash::hashPosition(const Position& pos) {
     for (int i = 0; i < 10; ++i) {
         uint64_t pieces = pos.pieceBoards[i];
         while (pieces) {
-            bitScan(&sq, pieces);
+            sq = bitScan(pieces);
             posHash ^= pieceHash[i][sq];
             pieces &= pieces - 1;
         }

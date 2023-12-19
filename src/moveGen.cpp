@@ -1,9 +1,10 @@
 #include "../inc/moveGen.h"
 #include "../inc/GUI.h"
+#include <cassert>
 
 
 
-MoveGen::MoveGen() : magicalBits::MagicalBitboards() {
+MoveGen::MoveGen(){
 	initLineBB(LineBB);
 }
 
@@ -159,7 +160,7 @@ const void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list,
 	
 	unsigned long b;
 	while (bishops) {
-		bitScan(&b, bishops);
+		b = bitScan(bishops);
 		bishops &= bishops - 1;
 		uint64_t moves = attackBB<p>(pos.teamBoards[0], b) & nonTeam & block;
 		if constexpr (pins) {
@@ -185,7 +186,7 @@ const void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list
 
 	unsigned long kn;
 	while (knights) {
-		bitScan(&kn, knights);
+		kn = bitScan(knights);
 		knights &= knights - 1;
 		const uint64_t moves = stepAttackBB<Knight>(kn) & nonTeam & pos.st.blockForKing;
 		makeCaptureMove<whiteToMove>(pos.pieceBoards, move_list, moves & enemy, kn, CAPTURE | pID);
@@ -213,10 +214,10 @@ const void MoveGen::enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP
 	
 	const uint64_t boardWithoutEP = (realPawn | capturers) ^ pos.teamBoards[0];
 
-	if (legalWhenCheck && !(kingSameRank && bitCount(capturers) == 1 && rookAttack(boardWithoutEP, king) & rankPin)) {
+	if (legalWhenCheck && !(kingSameRank && bitCount(capturers) == 1 && attackBB<Rook>(boardWithoutEP, king) & rankPin)) {
 		unsigned long fromSQ;
 		while (capturers) {
-			bitScan(&fromSQ, capturers);
+			fromSQ = bitScan(capturers);
 			capturers &= capturers - 1;
 			//Only add if the pawn isn't pinned or the move moves along the pin
 			if constexpr (pins) {
@@ -250,7 +251,7 @@ template<bool pin, bool isPromotion>
 const inline void MoveGen::makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const {
 	unsigned long toSQ;
 	while (toSQs) {
-		bitScan(&toSQ, toSQs);
+		toSQ = bitScan(toSQs);
 		toSQs &= toSQs - 1;
 		if constexpr (pin) {
 			const uint8_t from = toSQ + back;
@@ -270,7 +271,7 @@ template<bool whiteToMove, bool pin, bool isPromotion>
 const inline void MoveGen::makePawnCapture(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const{
 	unsigned long toSQ;
 	while (toSQs) {
-		bitScan(&toSQ, toSQs);
+		toSQ = bitScan(toSQs);
 		toSQs &= toSQs - 1;
 		const uint32_t flagUpdate = flagAndPieces | (getPiece<!whiteToMove>(pos.pieceBoards, toSQ) << 28);
 		if constexpr (pin) {
@@ -291,7 +292,7 @@ const inline void MoveGen::makePawnCapture(const Position& pos, MoveList& move_l
 const inline void MoveGen::makePieceMove(MoveList& move_list, uint64_t toSQs, uint8_t from, uint32_t flagAndPieces) const {
 	unsigned long toSQ;
 	while (toSQs) {
-		bitScan(&toSQ, toSQs);
+		toSQ = bitScan(toSQs);
 		toSQs &= toSQs - 1;
 		constructMove<false>(move_list, from, toSQ, flagAndPieces);
 	}
@@ -301,7 +302,7 @@ template<bool whiteToMove>
 const inline void MoveGen::makeCaptureMove(const uint64_t pieceBoards[], MoveList& move_list, uint64_t toSQs, uint8_t from, uint32_t flagAndPiece) const {
 	unsigned long toSQ;
 	while (toSQs) {
-		bitScan(&toSQ, toSQs);
+		toSQ = bitScan(toSQs);
 		toSQs &= toSQs - 1;
 		const uint32_t flagUpdate = flagAndPiece | (getPiece<!whiteToMove>(pieceBoards, toSQ) << 28);
 		constructMove<false>(move_list, from, toSQ, flagUpdate);
@@ -337,8 +338,8 @@ const void MoveGen::setCheckSquares(Position& pos) const{
 	const uint8_t enemyKing = pos.kings[!whiteToMove];
 	pos.checkSquares[0] = pawnAttackBB<!whiteToMove>(BB(enemyKing));
 	pos.checkSquares[1] = knightLookUp[enemyKing];
-	pos.checkSquares[2] = bishopAttack(pos.teamBoards[0], enemyKing);
-	pos.checkSquares[3] = rookAttack(pos.teamBoards[0], enemyKing);
+	pos.checkSquares[2] = attackBB<Bishop>(pos.teamBoards[0], enemyKing);
+	pos.checkSquares[3] =  attackBB<Rook>(pos.teamBoards[0], enemyKing);
 }
 
 
@@ -361,7 +362,7 @@ const void MoveGen::pinnedBoard(Position& pos){
 	unsigned long sq;
 	while (snipers) {
 		//Pop first sniper
-		bitScan(&sq, snipers);
+		sq = bitScan(snipers);
 		snipers &= snipers - 1;
 
 		//Find squares between the pinner and the king
@@ -426,6 +427,9 @@ template const void MoveGen::setCheckSquares<false>(Position&) const;
 template const bool MoveGen::generateAllMoves<true>(const Position&, MoveList&, const bool) const;
 template const bool MoveGen::generateAllMoves<false>(const Position&, MoveList&, const bool) const;
 
+template const uint64_t MoveGen::attackBB<Rook>(uint64_t board, uint8_t square) const;
+template const uint64_t MoveGen::attackBB<Bishop>(uint64_t board, uint8_t square) const;
+
 
 
 
@@ -438,7 +442,7 @@ const uint64_t MoveGen::pieceAttack(uint64_t board, uint64_t pieces) const{
 	uint64_t attack = 0;
 	unsigned long fromSQ;
 	while (pieces) {
-		bitScan(&fromSQ, pieces);
+		fromSQ = bitScan(pieces);
 		pieces &= pieces - 1;
 		attack |= attackBB<p>(board, fromSQ);
 	}
@@ -450,7 +454,7 @@ const uint64_t MoveGen::stepAttack(uint64_t pieces) const {
 	uint64_t attack = 0;
 	unsigned long fromSQ;
 	while (pieces) {
-		bitScan(&fromSQ, pieces);
+		fromSQ = bitScan(pieces);
 		pieces &= pieces - 1;
 		attack |= stepAttackBB<p>(fromSQ);
 	}
@@ -472,7 +476,6 @@ const inline uint64_t MoveGen::stepAttackBB(uint8_t square) const{
 
 template<Piece p>
 const inline uint64_t MoveGen::attackBB(uint64_t board, uint8_t square) const {
-	//static_assert(p > 1);
 	if constexpr (p == Bishop) {
 		return bishopAttack(board, square);
 	}
@@ -480,24 +483,32 @@ const inline uint64_t MoveGen::attackBB(uint64_t board, uint8_t square) const {
 		return rookAttack(board, square);
 	}
 	if constexpr (p == Queen) {
-		return rookAttack(board, square) | bishopAttack(board, square);
+		return bishopAttack(board, square) | rookAttack(board, square);
 	}
 }
 
-const inline uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
-	board &= m_bishopMasks[square];
-	board *= m_bishopMagicBitboard[square];
-	board >>= (64 - m_occupacyCountBishop[square]);
-	return m_bishopAttacks[square][board];
+inline const uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
+    return rookAttackPtr[square][pext(board, rookBits[square])];
 }
 
-const inline uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
-	board &= m_rookMasks[square];
-	board *= m_rookMagicBitboard[square];
-	board >>= (64 - m_occupacyCountRook[square]);
-	return m_rookAttacks[square][board];
+inline const uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
+    return bishopAttackPtr[square][pext(board, bishopBits[square])];
 }
 
+
+// const inline uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
+// 	board &= m_bishopMasks[square];
+// 	board *= m_bishopMagicBitboard[square];
+// 	board >>= (64 - m_occupacyCountBishop[square]);
+// 	return m_bishopAttacks[square][board];
+// }
+
+// const inline uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
+// 	board &= m_rookMasks[square];
+// 	board *= m_rookMagicBitboard[square];
+// 	board >>= (64 - m_occupacyCountRook[square]);
+// 	return m_rookAttacks[square][board];
+// }
 
 template const uint64_t MoveGen::stepAttackBB<King>(uint8_t square) const;
 

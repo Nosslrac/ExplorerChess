@@ -1,5 +1,5 @@
 #pragma once
-#include <intrin.h>
+#include <x86intrin.h>
 #include <cinttypes>
 #include <iostream>
 #include "bitboardUtil.h"

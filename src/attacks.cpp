@@ -1,8 +1,9 @@
 #include <stdint.h>
-#include <intrin.h>
+#include <x86intrin.h>
 #include <functional>
 #include <random>
 #include "../inc/attacks.h"
+#include "../inc/bitboardUtil.h"
 
 namespace magicalBits
 {
@@ -162,7 +163,7 @@ namespace magicalBits
         unsigned long square;
         for (uint32_t count = 0; count < bitCount; count++)
         {
-            _BitScanForward64(&square, attackMask);
+            square = bitScan(attackMask);
             attackMask &= attackMask - 1;
 
             if (position & (1 << count))
