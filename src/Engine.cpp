@@ -324,6 +324,8 @@ uint64_t Engine::search(Position& pos, int depth) {
 template<bool whiteToMove>
 Move Engine::analysis(Position& pos, int depth) {
     _evalTransposition.clear();
+    pos.materialValue = _evaluation->materialValue(pos);
+
     MoveList move_list;
     const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list, false);
     MoveOrder::moveSort(move_list, pos, depth);
@@ -967,6 +969,8 @@ void Engine::tests()
     bool fail = false;
     Position pos;
     int testNr = 1;
+    double totalTime = 0.0;
+    
     auto test = [&](const char* str,
         uint64_t count, uint8_t perftLevel = 6) -> double {
             using namespace std;
@@ -978,6 +982,7 @@ void Engine::tests()
             auto end = chrono::system_clock::now();
             chrono::duration<double> elapsed_time = end - start;
             double kN = static_cast<double>(perftCount) / elapsed_time.count() / 1000;
+            totalTime += elapsed_time.count();
             cout << "Time: " << elapsed_time.count() << "s" << endl;
             cout << "KN/s: "
                 << static_cast<double>(perftCount) / elapsed_time.count() / 1000
@@ -1019,6 +1024,7 @@ void Engine::tests()
 
     std::vector<double> results;
 
+
     results.push_back(test("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 119060324ULL, 6));
 
     
@@ -1049,7 +1055,7 @@ void Engine::tests()
     std::cout << "Average kN/s: " << geo_mean << std::endl;
     if (!fail)
     {
-        std::cout << "Current build cleared all tests" << std::endl; 
+        std::cout << "Current build cleared all tests in " << totalTime << " s" << std::endl; 
     }
 }
 

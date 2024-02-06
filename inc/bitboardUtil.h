@@ -119,8 +119,9 @@ struct Position {
 
 	bool whiteToMove;
 	uint16_t ply;
+	int materialValue;
 
-	bool operator ==(const Position& pos) {
+	bool operator ==(const Position& pos) const{
 		return memcmp(this, &pos, sizeof(Position)) == 0;
 	}
 };
@@ -229,7 +230,7 @@ constexpr uint8_t castlingModifiers[64] = {
 
 
 //---------------Bitboard functions------------------
-const uint8_t long_bit_scan(uint64_t i);
+   
 const void initLineBB(uint64_t (& lineBB)[64][64]);
 const uint64_t pinned_ray(int, int);
 

@@ -487,6 +487,7 @@ const inline uint64_t MoveGen::attackBB(uint64_t board, uint8_t square) const {
 	}
 }
 
+#ifdef PEXT
 inline const uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
     return rookAttackPtr[square][pext(board, rookBits[square])];
 }
@@ -494,21 +495,24 @@ inline const uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
 inline const uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
     return bishopAttackPtr[square][pext(board, bishopBits[square])];
 }
+#else
+const inline uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
+	board &= m_bishopMasks[square];
+	board *= m_bishopMagicBitboard[square];
+	board >>= (64 - m_occupacyCountBishop[square]);
+	return m_bishopAttacks[square][board];
+}
+
+const inline uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
+	board &= m_rookMasks[square];
+	board *= m_rookMagicBitboard[square];
+	board >>= (64 - m_occupacyCountRook[square]);
+	return m_rookAttacks[square][board];
+}
+#endif
 
 
-// const inline uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
-// 	board &= m_bishopMasks[square];
-// 	board *= m_bishopMagicBitboard[square];
-// 	board >>= (64 - m_occupacyCountBishop[square]);
-// 	return m_bishopAttacks[square][board];
-// }
 
-// const inline uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
-// 	board &= m_rookMasks[square];
-// 	board *= m_rookMagicBitboard[square];
-// 	board >>= (64 - m_occupacyCountRook[square]);
-// 	return m_rookAttacks[square][board];
-// }
 
 template const uint64_t MoveGen::stepAttackBB<King>(uint8_t square) const;
 

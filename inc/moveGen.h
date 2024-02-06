@@ -2,10 +2,14 @@
 #include "attacks.h"
 #include "bitboardUtil.h"
 #include "attackPext.h"
+#define PEXT
 
 
-
+#ifdef PEXT
 class MoveGen : PEXT_ATTACK::PextAttack{
+#else
+class MoveGen : magicalBits::MagicalBitboards{
+#endif
 public:
 	MoveGen();
 	template<bool whiteToMove>

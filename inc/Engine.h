@@ -55,6 +55,9 @@ private:
 	template<bool whiteToMove, bool castle>
 	int negaMax(Position& pos, int alpha, int beta, int depth);
 
+	template<bool whiteToMove, bool castle>
+	const Move traverseMoves(Position& pos, int depth, int alpha, int beta);
+
 	template<bool whiteToMove>
 	int qSearch(Position& pos, int alpha, int beta);
 

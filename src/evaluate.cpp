@@ -19,14 +19,30 @@ const int Evaluation::evaluate(const Position& pos) const {
 
 template<bool whiteToMove>
 const int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const{
-	int diff = 0;
+	int materialBalance = 0;
 	for (int i = 0; i < 5; ++i) {
-		diff += (bitCount(pieces[i]) - bitCount(pieces[i + 5])) * pieceValue[i];
+		materialBalance += (bitCount(pieces[i]) - bitCount(pieces[i + 5])) * pieceValue[i];
 	}
+
+
 	constexpr int flip = whiteToMove ? 1 : -1;
-	return diff * flip;
+	return materialBalance * flip;
 }
 
+
+const int Evaluation::materialValue(const Position& pos) const{
+	int whiteValue = 0;
+	int blackValue = 0;
+	for(uint8_t i = 0; i < 64; ++i){
+		if(pos.teamBoards[1] & BB(i)){
+			whiteValue += whitePST[getPiece<true>(pos.pieceBoards, i)][i];
+		}
+		else if(pos.teamBoards[2] & BB(i)){
+			blackValue += blackPST[getPiece<false>(pos.pieceBoards, i)][i];
+		}
+	}
+	return whiteValue - blackValue;
+}
 
 
 
