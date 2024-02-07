@@ -51,7 +51,7 @@ const bool MoveGen::generateAllMoves(const Position& pos, MoveList& move_list, c
 template<bool whiteToMove, bool castling>
 const void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
 	//CHANGE KING, he is not a bitboard any more
-	constexpr uint32_t mover = King << 24;
+	constexpr uint32_t mover = (King + !whiteToMove) << 24;
 
 	
 	const uint8_t king = pos.kings[!whiteToMove];
@@ -175,7 +175,7 @@ const void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list,
 
 template<bool whiteToMove, bool pins>
 const void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
-	constexpr uint32_t pID = whiteToMove ? Knight << 24 : Knight + 5 << 24;
+	constexpr uint32_t pID = whiteToMove ? Knight << 24 : (Knight + 5) << 24;
 	uint64_t knights = getPieces<whiteToMove, Knight>(pos);
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
 	const uint64_t nonTeam = moveableSquares<whiteToMove>(pos);
@@ -463,58 +463,9 @@ const uint64_t MoveGen::stepAttack(uint64_t pieces) const {
 
 
 
-template<Piece p>
-const inline uint64_t MoveGen::stepAttackBB(uint8_t square) const{
-	static_assert(p == Knight || p == King);
-	if constexpr (p == Knight) {
-		return knightLookUp[square];
-	}
-	if constexpr (p == King) {
-		return kingLookUp[square];
-	}
-}
-
-template<Piece p>
-const inline uint64_t MoveGen::attackBB(uint64_t board, uint8_t square) const {
-	if constexpr (p == Bishop) {
-		return bishopAttack(board, square);
-	}
-	if constexpr (p == Rook) {
-		return rookAttack(board, square);
-	}
-	if constexpr (p == Queen) {
-		return bishopAttack(board, square) | rookAttack(board, square);
-	}
-}
-
-#ifdef PEXT
-inline const uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
-    return rookAttackPtr[square][pext(board, rookBits[square])];
-}
-
-inline const uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
-    return bishopAttackPtr[square][pext(board, bishopBits[square])];
-}
-#else
-const inline uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
-	board &= m_bishopMasks[square];
-	board *= m_bishopMagicBitboard[square];
-	board >>= (64 - m_occupacyCountBishop[square]);
-	return m_bishopAttacks[square][board];
-}
-
-const inline uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
-	board &= m_rookMasks[square];
-	board *= m_rookMagicBitboard[square];
-	board >>= (64 - m_occupacyCountRook[square]);
-	return m_rookAttacks[square][board];
-}
-#endif
 
 
 
-
-template const uint64_t MoveGen::stepAttackBB<King>(uint8_t square) const;
 
 
 

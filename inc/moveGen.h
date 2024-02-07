@@ -32,9 +32,29 @@ public:
 
 	//Move to private when working
 	template<Piece p>
-	const inline uint64_t stepAttackBB(uint8_t square) const;
+	inline const uint64_t stepAttackBB(uint8_t square) const{
+		static_assert(p == Knight || p == King);
+		if constexpr (p == Knight) {
+			return knightLookUp[square];
+		}
+		if constexpr (p == King) {
+			return kingLookUp[square];
+		}
+	}
+	
 	template<Piece p>
-	const inline uint64_t attackBB(const uint64_t board, const uint8_t square) const;
+	inline const uint64_t attackBB(const uint64_t board, const uint8_t square) const {
+		if constexpr (p == Bishop) {
+			return bishopAttack(board, square);
+		}
+		if constexpr (p == Rook) {
+			return rookAttack(board, square);
+		}
+		if constexpr (p == Queen) {
+			return bishopAttack(board, square) | rookAttack(board, square);
+		}
+	}
+	
 	
 	//Checks and pins
 	template<bool whiteToMove>
@@ -53,8 +73,6 @@ private:
 	template<Piece p>
 	const uint64_t stepAttack(uint64_t pieces) const;
 
-	inline const uint64_t bishopAttack(uint64_t board, uint8_t square) const;
-	inline const uint64_t rookAttack(uint64_t board, uint8_t square) const;
 
 	template<bool isPromotion>
 	const inline void constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPiece) const;
@@ -80,6 +98,32 @@ private:
 
 
 	//------------------Helper lookups------------------------------
+
+
+	#ifdef PEXT
+	inline const uint64_t rookAttack(uint64_t board, uint8_t square) const{
+		return rookAttackPtr[square][pext(board, rookBits[square])];
+	}
+
+	inline const uint64_t bishopAttack(uint64_t board, uint8_t square) const{
+		return bishopAttackPtr[square][pext(board, bishopBits[square])];
+	}
+
+	#else
+	inline const uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
+		board &= m_bishopMasks[square];
+		board *= m_bishopMagicBitboard[square];
+		board >>= (64 - m_occupacyCountBishop[square]);
+		return m_bishopAttacks[square][board];
+	}
+
+	inline const uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
+		board &= m_rookMasks[square];
+		board *= m_rookMagicBitboard[square];
+		board >>= (64 - m_occupacyCountRook[square]);
+		return m_rookAttacks[square][board];
+	}
+	#endif
 
 	template<bool white>
 	constexpr inline uint64_t pawnAttackBB(uint64_t squareBB) const {

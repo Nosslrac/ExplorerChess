@@ -12,21 +12,18 @@ template<bool whiteToMove>
 const int Evaluation::evaluate(const Position& pos) const {
 	const int safety = Evaluation::kingSafety<whiteToMove>(pos);
 	const int passedPawn = Evaluation::passedPawns<whiteToMove>(pos.pieceBoards);
-	const int material = staticPieceEvaluation<whiteToMove>(pos.pieceBoards);
-	return material;
+	constexpr int flip = whiteToMove ? 1 : -1;
+	return (pos.materialScore + pos.materialValue) * flip;
 }
 
 
-template<bool whiteToMove>
+
 const int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const{
 	int materialBalance = 0;
 	for (int i = 0; i < 5; ++i) {
 		materialBalance += (bitCount(pieces[i]) - bitCount(pieces[i + 5])) * pieceValue[i];
 	}
-
-
-	constexpr int flip = whiteToMove ? 1 : -1;
-	return materialBalance * flip;
+	return materialBalance;
 }
 
 
@@ -34,13 +31,19 @@ const int Evaluation::materialValue(const Position& pos) const{
 	int whiteValue = 0;
 	int blackValue = 0;
 	for(uint8_t i = 0; i < 64; ++i){
-		if(pos.teamBoards[1] & BB(i)){
-			whiteValue += whitePST[getPiece<true>(pos.pieceBoards, i)][i];
+		if(pos.kings[0] == i){
+			whiteValue += PSTs[10][i];
+		}
+		else if(pos.kings[1] == i){
+			blackValue += PSTs[11][i];
+		}
+		else if(pos.teamBoards[1] & BB(i)){
+			whiteValue += PSTs[getPiece<true>(pos.pieceBoards, i)][i];
 		}
 		else if(pos.teamBoards[2] & BB(i)){
-			blackValue += blackPST[getPiece<false>(pos.pieceBoards, i)][i];
+			blackValue += PSTs[getPiece<false>(pos.pieceBoards, i)][i];
 		}
-	}
+ 	}
 	return whiteValue - blackValue;
 }
 

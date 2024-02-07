@@ -74,7 +74,7 @@ void Engine::runUI() {
             fenInit(_pos, arg2);
         }
         else {
-            fenInit(_pos, "7k/3n4/n1B5/3B1K2/8/1n2B3/8/8 w - - 0 1");
+            fenInit(_pos, "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10");
         }
 
 	}
@@ -135,13 +135,7 @@ void Engine::runUI() {
         GUI::print_pieces(_pos);
     }
     else if (strcmp(command.c_str(), "g") == 0) {
-        // MoveList ml;
-        // _moveGen->generateAllMoves<true>(_pos, ml, true);
-        // int i = 0;
-        // while (ml.moves[i++]) {
-        //     GUI::printMove(ml.moves[i]);
-        //     std::cout << std::endl;
-        // }
+        moveIntegrity<true, true>(_pos);
     }
     else if(strcmp(command.c_str(), "bishop") == 0){
         uint64_t bs = _pos.pieceBoards[2];
@@ -365,8 +359,8 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
     //Negamax with alpha beta pruning
     nodes++;
     if (depth == 0) {
-        return qSearch<whiteToMove>(pos, alpha, beta);
-        //return _evaluation->evaluate<whiteToMove>(pos);
+        //return qSearch<whiteToMove>(pos, alpha, beta);
+        return _evaluation->evaluate<whiteToMove>(pos);
     }
 
     //if (_evalTransposition.contains(pos.st.hashKey)) {
@@ -445,19 +439,16 @@ void Engine::moveIntegrity(Position& pos) {
     _moveGen->generateAllMoves<whiteToMove>(pos, m, false);
     Position copy = pos;
     for (int i = 0; i < m.size(); ++i) {
+        const int materialValue = pos.materialValue;
+        const int materialScore = pos.materialScore;
         doMove<whiteToMove, castle>(pos, m.moves[i]);
         undoMove<!whiteToMove, castle>(pos, m.moves[i]);
-        /*
-        if (!(copy == pos)) {
-            GUI::print_pieces(pos);
+        
+        if (pos.materialScore != materialScore || pos.materialValue != materialValue) {
             GUI::parseMove(m.moves[i]);
-            std::cout << "Team boards: " << std::endl;
-            std::cout << "Copy: " << std::endl;
-            GUI::print_bit_board(copy.teamBoards[2]);
-            std::cout << "Current: " << std::endl;
-            GUI::print_bit_board(pos.teamBoards[2]);            
+            std::cout << "Material: " << materialValue << ", After: " << pos.materialValue << std::endl;            
         }
-        */
+        
     }
 }
 
@@ -493,8 +484,12 @@ void Engine::doMove(Position& pos, uint32_t move) {
     constexpr char add = whiteToMove ? 8 : -8;
     constexpr uint8_t enemyPawn = whiteToMove ? 5 : 0;
     constexpr uint8_t teamPawn = whiteToMove ? 0 : 5;
+    constexpr int8_t scoreFavor = whiteToMove ? 1 : -1;
+    constexpr int8_t blackOffset = whiteToMove ? -5 : 0;
 
     pos.teamBoards[team] ^= fromBB ^ toBB;
+    //Increment position value based on prev move
+    pos.materialScore += scoreFavor * _evaluation->pieceScoreChange(from, to, mover);
     
     //Remove old ep hash if there was one
     if (pos.st.enPassant != 0) {
@@ -502,9 +497,7 @@ void Engine::doMove(Position& pos, uint32_t move) {
         pos.st.enPassant = 0;
     }
  
-
-
-    if (mover == King) {
+    if (mover > King - 1) {
         if constexpr (whiteToMove) {
             pos.kings[0] = to;
             newHash ^= _zobristHash->kingHash[0][from] ^ _zobristHash->kingHash[0][to];
@@ -518,20 +511,25 @@ void Engine::doMove(Position& pos, uint32_t move) {
             pos.pieceBoards[captured] ^= toBB;
             pos.teamBoards[enemy] ^= toBB;
             newHash ^= _zobristHash->pieceHash[captured][to];
+            pos.materialValue += scoreFavor * _evaluation->getPieceValue(captured + blackOffset);
         }
 
         if constexpr (castle) {
+            constexpr int8_t rook = whiteToMove ? 3 : 8;
             if (flags == CASTLE_KING) {
                 doCastle<whiteToMove, true>(pos);
                 constexpr uint8_t rookFrom = whiteToMove ? 63 : 7;
                 constexpr uint8_t rookTo = whiteToMove ? 61 : 5;
+                 
                 newHash ^= _zobristHash->pieceHash[3][rookFrom] ^ _zobristHash->pieceHash[3][rookTo];
+                pos.materialScore += scoreFavor * _evaluation->pieceScoreChange(rookFrom, rookTo, rook);
             }
             else if (flags == Flags::CASTLE_QUEEN) {
                 doCastle<whiteToMove, false>(pos);
                 constexpr uint8_t rookFrom = whiteToMove ? 56 : 0;
                 constexpr uint8_t rookTo = whiteToMove ? 59 : 3;
                 newHash ^= _zobristHash->pieceHash[3][rookFrom] ^ _zobristHash->pieceHash[3][rookTo];
+                pos.materialScore += scoreFavor * _evaluation->pieceScoreChange(rookFrom, rookTo, rook);
             }
         }
     }
@@ -545,6 +543,7 @@ void Engine::doMove(Position& pos, uint32_t move) {
             pos.pieceBoards[captured] ^= toBB;
             pos.teamBoards[enemy] ^= toBB;
             newHash ^= _zobristHash->pieceHash[captured][to];
+            pos.materialValue += scoreFavor * _evaluation->getPieceValue(captured + blackOffset);
             break;
         case DOUBLE_PUSH:
             pos.st.enPassant = to + add;
@@ -554,6 +553,7 @@ void Engine::doMove(Position& pos, uint32_t move) {
             pos.pieceBoards[enemyPawn] ^= BB(to + add);
             pos.teamBoards[enemy] ^= BB(to + add);
             newHash ^= _zobristHash->pieceHash[enemyPawn][to + add]; // Remove pawn from hash
+            pos.materialValue += scoreFavor * _evaluation->getPieceValue(captured + blackOffset);
             break;
         default: //Promotion
             pos.pieceBoards[teamPawn] ^= toBB;
@@ -561,10 +561,15 @@ void Engine::doMove(Position& pos, uint32_t move) {
             const uint8_t pID = 1 + 5 * !whiteToMove + getPromo(move);
             pos.pieceBoards[pID] |= toBB;
             newHash ^= _zobristHash->pieceHash[pID][to];
-            if (flags & CAPTURE) {
+            //Remove pawn score and add new piece value
+            pos.materialValue += scoreFavor * (_evaluation->getPieceValue(pID + (blackOffset ^ -5)) - 100);
+            //Pawn score will already have been removed with pieceScoreChange
+            pos.materialScore += scoreFavor * _evaluation->pieceScore(to, pID); 
+            if (flags & CAPTURE) { 
                 pos.pieceBoards[captured] ^= toBB;
                 pos.teamBoards[enemy] ^= toBB;
                 newHash ^= _zobristHash->pieceHash[captured][to];
+                pos.materialValue += scoreFavor * _evaluation->getPieceValue(captured + blackOffset);
             }
             break;
         }
@@ -727,8 +732,14 @@ void Engine::undoMove(Position& pos, uint32_t move) {
 
     const uint64_t fromBB = BB(from);
     const uint64_t toBB = BB(to);
-    const uint64_t capMask = toBB * (((flags & CAPTURE) == CAPTURE) && flags != EP_CAPTURE);
+    const bool isCapture = (((flags & CAPTURE) == CAPTURE) && flags != EP_CAPTURE);
+    const uint64_t capMask = toBB * isCapture;
 
+    constexpr int8_t scoreFavor = whiteToMove ? -1 : 1;
+    constexpr int8_t blackOffset = whiteToMove ? 0 : -5;
+
+    //Increment position value based on prev move
+    pos.materialScore += scoreFavor * _evaluation->pieceScoreChange(to, from, mover);
     //Incrementally update position
     if constexpr (whiteToMove) {
         pos.teamBoards[2] ^= fromBB ^ toBB;
@@ -741,7 +752,9 @@ void Engine::undoMove(Position& pos, uint32_t move) {
 
     pos.pieceBoards[captured] ^= capMask;
 
-    if (mover == King) {
+    pos.materialValue += isCapture * -scoreFavor * _evaluation->getPieceValue(captured + blackOffset);
+
+    if (mover > King - 1) {
         pos.kings[whiteToMove] = from;
 
 
@@ -774,11 +787,17 @@ void Engine::undoMove(Position& pos, uint32_t move) {
         if ((flags & PROMO_N) != 0) {
             if constexpr (whiteToMove) {
                 pos.pieceBoards[5] ^= toBB;
-                pos.pieceBoards[6 + getPromo(move)] ^= toBB;
+                const int8_t pID = 6 + getPromo(move);
+                pos.pieceBoards[pID] ^= toBB;
+                pos.materialValue -= scoreFavor * (_evaluation->getPieceValue(pID) - 100);
+                pos.materialScore -= scoreFavor * _evaluation->pieceScore(to, pID);
             }
             else {
                 pos.pieceBoards[0] ^= toBB;
-                pos.pieceBoards[1 + getPromo(move)] ^= toBB;
+                const int8_t pID = 1 + getPromo(move);
+                pos.pieceBoards[pID] ^= toBB;
+                pos.materialValue -= scoreFavor * (_evaluation->getPieceValue(pID) - 100);
+                pos.materialScore -= scoreFavor * _evaluation->pieceScore(to, pID);
             }
         }
 
@@ -961,6 +980,8 @@ void Engine::fenInit(Position& pos, std::string fen) {
     }
     pos.ply = 0;
     pos.st.hashKey = _zobristHash->hashPosition(pos);
+    pos.materialScore = _evaluation->materialValue(pos);
+    pos.materialValue = _evaluation->staticPieceEvaluation(pos.pieceBoards);
 }
 
 

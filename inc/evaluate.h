@@ -11,13 +11,26 @@ public:
 
 	template<bool whiteToMove>
 	const int evaluate(const Position& pos) const;
+
+	inline const int pieceScoreChange(int8_t from, int8_t to, int8_t mover) const{
+		return PSTs[mover][to] - PSTs[mover][from];
+	}
+
+	inline const int pieceScore(int8_t sq, int8_t mover) const{
+		return PSTs[mover][sq];
+	}
+
+	inline const int getPieceValue(int8_t index){
+		return pieceValue[index];
+	}
+
+	//Material balance
 	const int materialValue(const Position& pos) const;
+	const int staticPieceEvaluation(const uint64_t piece[10]) const;
 private:
 	const uint16_t pieceValue[5] = {100, 300, 300, 500, 900};
 
-	//Material balance
-	template<bool whiteToMove>
-	const int staticPieceEvaluation(const uint64_t piece[10]) const;
+
 
 
 	//Static pawn structure evaluation, to be stored in a lookup table
@@ -127,12 +140,12 @@ private:
 
 	const int8_t blackBishopPST[64] = {
 		-20,-10,-10,-10,-10,-10,-10,-20,
-		-10,  0,  0,  0,  0,  0,  0,-10,
-		-10,  0,  5, 10, 10,  5,  0,-10,
-		-10,  5,  5, 10, 10,  5,  5,-10,
-		-10,  0, 10, 10, 10, 10,  0,-10,
-		-10, 10, 10, 10, 10, 10, 10,-10,
 		-10,  5,  0,  0,  0,  0,  5,-10,
+		-10, 10, 10, 10, 10, 10, 10,-10,
+		-10,  0, 10, 10, 10, 10,  0,-10,
+		-10,  5,  5, 10, 10,  5,  5,-10,
+		-10,  0,  5, 10, 10,  5,  0,-10,
+		-10,  0,  0,  0,  0,  0,  0,-10,
 		-20,-10,-10,-10,-10,-10,-10,-20,
 	};
 
@@ -148,7 +161,7 @@ private:
 	};
 
 	const int8_t blackRookPST[64] = {
-		0,  0,  0,  5,  5,  0,  0,  0
+		0,  0,  0,  5,  5,  0,  0,  0,
 		-5,  0,  0,  0,  0,  0,  0, -5,
 		-5,  0,  0,  0,  0,  0,  0, -5,
 		-5,  0,  0,  0,  0,  0,  0, -5,
@@ -159,20 +172,19 @@ private:
 		
 	};
 
-	const int8_t* whitePST[5] = {
-		whiteKingPST,
+	const int8_t* PSTs[12] = {
 		whitePawnPST,
 		whiteKnightPST,
 		whiteBishopPST,
 		whiteRookPST,
-	};
-
-	const int8_t* blackPST[5] = {
-		blackKingPST,
+		whiteBishopPST,
 		blackPawnPST,
 		blackKnightPST,
 		blackBishopPST,
 		blackRookPST,
+		blackBishopPST,
+		whiteKingPST,
+		blackKingPST
 	};
 
 	//MoveGen to look up attacks and moves

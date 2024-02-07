@@ -8,15 +8,7 @@
 * Note: Won't find the king, if it returns 0 something has gone wrong elsewhere
 * Default will be white pawns
 */
-template<bool white>
-const inline uint8_t getPiece(const uint64_t pieces[], uint8_t sq) {
-	const uint64_t fromBB = BB(sq);
-	for (int i = 5 * !white; i < 5 + 5 * !white; ++i) {
-		if (pieces[i] & fromBB)
-			return i;
-	}
-	return King;
-}
+
 
 
 

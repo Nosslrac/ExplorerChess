@@ -132,8 +132,8 @@ namespace GUI {
 		default: fString = "PROMO";
 			break;
 		}
-		char buff[100];
-		printf(buff, "From: %d, To: %d, Mover: %d, Captured: %d, ", from, to, mover, capped);
+		char buff[44];
+		std::snprintf(buff, 44, "From: %d, To: %d, Mover: %d, Captured: %d, ", from, to, mover, capped);
 		std::cout << buff << "Flags: " + fString << std::endl;
 
 		GUI::print_bit_board(BB(from) | BB(to));

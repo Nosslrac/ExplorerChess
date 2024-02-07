@@ -1,4 +1,15 @@
 {
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "clang++- Build and debug active file"
+        },
+        ],
+        "compounds": []
+    },
     "files.associations": {
         "cstdint": "cpp",
         "iostream": "cpp",

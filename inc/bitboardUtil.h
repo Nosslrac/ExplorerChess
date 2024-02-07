@@ -17,6 +17,8 @@
 #define BB(i) (1ULL << i)
 
 
+using move_t = uint32_t;
+
 
 
 enum Piece {
@@ -119,6 +121,7 @@ struct Position {
 
 	bool whiteToMove;
 	uint16_t ply;
+	int materialScore;
 	int materialValue;
 
 	bool operator ==(const Position& pos) const{
@@ -147,7 +150,14 @@ struct Move {
 
 
 template<bool white>
-const inline uint8_t getPiece(const uint64_t pieces[], uint8_t sq);
+inline const uint8_t getPiece(const uint64_t pieces[], const uint8_t sq) {
+	const uint64_t fromBB = BB(sq);
+	for (int i = 5 * !white; i < 5 + 5 * !white; ++i) {
+		if (pieces[i] & fromBB)
+			return i;
+	}
+	return white ? King : King + 1;
+}
 
 
 template<bool whiteToMove, Direction D>
