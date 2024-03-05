@@ -13,7 +13,7 @@ const int Evaluation::evaluate(const Position& pos) const {
 	const int safety = Evaluation::kingSafety<whiteToMove>(pos);
 	const int passedPawn = Evaluation::passedPawns<whiteToMove>(pos.pieceBoards);
 	constexpr int flip = whiteToMove ? 1 : -1;
-	return (pos.materialScore + pos.materialValue) * flip;
+	return (pos.st.materialScore + pos.st.materialValue) * flip;
 }
 
 

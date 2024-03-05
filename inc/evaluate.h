@@ -1,8 +1,9 @@
 #pragma once
 #include "bitboardUtil.h"
-#include <unordered_map>
+#include "robin_hood.h"
 #include "moveGen.h"
 #include "GUI.h"
+#include <chrono>
 
 class Evaluation {
 public:
@@ -49,7 +50,7 @@ private:
 	template<bool whiteToMove>
 	const int attackPotential(const uint64_t piece[10]) const;
 
-	std::unordered_map<uint64_t, int> pawnStructure;
+	robin_hood::unordered_map<uint64_t, int> pawnStructure;
 
 	//King safety (use some kind of pext for surrounding squares and then switch case maybe)
 	//Also open lines based on oponents sliding pieces potential penalty

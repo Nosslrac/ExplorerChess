@@ -106,6 +106,9 @@ struct StateInfo {
 
 	//Incremental
 	uint64_t hashKey;
+	int16_t materialScore;
+	int16_t materialValue;
+
 };
 
 //Inherits irreversible info from StateInfo 
@@ -121,9 +124,6 @@ struct Position {
 
 	bool whiteToMove;
 	uint16_t ply;
-	int materialScore;
-	int materialValue;
-
 	bool operator ==(const Position& pos) const{
 		return memcmp(this, &pos, sizeof(Position)) == 0;
 	}

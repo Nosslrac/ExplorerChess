@@ -24,7 +24,6 @@ all: directories explorer
 
 debug: directories explorer_debug
 
-
 #Create objects directory
 directories: $(OBJ_DIR) $(DEBUG_OBJ_DIR)
 
