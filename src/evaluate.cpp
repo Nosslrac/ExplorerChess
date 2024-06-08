@@ -9,16 +9,19 @@ Evaluation::Evaluation(MoveGen* moveGen) {
 
 
 template<bool whiteToMove>
-const int Evaluation::evaluate(const Position& pos) const {
+int Evaluation::evaluate(const Position& pos) const {
 	const int safety = Evaluation::kingSafety<whiteToMove>(pos);
 	const int passedPawn = Evaluation::passedPawns<whiteToMove>(pos.pieceBoards);
+	const int undefendedScore = Evaluation::undefendedPieces<whiteToMove>(pos);
 	constexpr int flip = whiteToMove ? 1 : -1;
 	return (pos.st.materialScore + pos.st.materialValue) * flip;
 }
 
 
-
-const int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const{
+/**
+ * NOTE: only call on initialization
+*/
+int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const{
 	int materialBalance = 0;
 	for (int i = 0; i < 5; ++i) {
 		materialBalance += (bitCount(pieces[i]) - bitCount(pieces[i + 5])) * pieceValue[i];
@@ -26,8 +29,19 @@ const int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const{
 	return materialBalance;
 }
 
+template<bool whiteToMove>
+int Evaluation::undefendedPieces(const Position& pos) const{
+	const uint64_t defended = _moveGen->findAttack<!whiteToMove>(pos); //Find what the moving side is defending
+	constexpr int8_t team = whiteToMove ? 0 : 5;
+	uint64_t minorNodefense = ~defended & (pos.pieceBoards[Knight + team] | pos.pieceBoards[Bishop + team]);
+	return -5 * bitCount(minorNodefense);
+}
 
-const int Evaluation::materialValue(const Position& pos) const{
+
+/**
+ * NOTE: only call on initialization
+*/
+int Evaluation::initMaterialValue(const Position& pos) const{
 	int whiteValue = 0;
 	int blackValue = 0;
 	for(uint8_t i = 0; i < 64; ++i){
@@ -52,7 +66,7 @@ const int Evaluation::materialValue(const Position& pos) const{
 
 
 template<bool whiteToMove>
-const int Evaluation::kingSafety(const Position& pos) const {
+int Evaluation::kingSafety(const Position& pos) const {
 	//Idea: extract surrounding bits for the king if there are a certain amount of sliding attackers
 	//Problem not sure what to do what should be considered since opponent has to exploit it
 	//See if there are a lot of pins close to king
@@ -75,7 +89,7 @@ const int Evaluation::kingSafety(const Position& pos) const {
 }
 
 template<bool whiteToMove>
-const int Evaluation::passedPawns(const uint64_t piece[10]) const {
+int Evaluation::passedPawns(const uint64_t piece[10]) const {
 	//Detect the files in front and the adjacent
 	constexpr uint8_t team = whiteToMove ? 0 : 5;
 	constexpr uint8_t enemy = whiteToMove ? 5 : 0;
@@ -101,5 +115,5 @@ const int Evaluation::passedPawns(const uint64_t piece[10]) const {
 
 
 
-template const int Evaluation::evaluate<true>(const Position&) const;
-template const int Evaluation::evaluate<false>(const Position&) const;
+template int Evaluation::evaluate<true>(const Position&) const;
+template int Evaluation::evaluate<false>(const Position&) const;

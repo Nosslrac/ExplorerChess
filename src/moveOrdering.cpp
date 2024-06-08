@@ -1,7 +1,7 @@
 #include "../inc/moveOrdering.h"
 
 
-void MoveOrder::moveSort(MoveList& move_list, const Position& pos, int depth){
+void MoveOrder::moveSort(MoveList& move_list, const Position&, int){
     captureSort(move_list);
 }
 

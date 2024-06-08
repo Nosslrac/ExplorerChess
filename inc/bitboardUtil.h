@@ -4,9 +4,7 @@
 #include <iostream>
 #include <string.h>
 
-#define bitCount(b) __builtin_popcountll(b)
-#define bitScan(BB) __builtin_ctzll(BB)
-#define pext(BB, mask) _pext_u64(BB, mask)
+
 
 #define getTo(move) (move & 0xFF)
 #define getFrom(move) ((move >> 8) & 0xFF)
@@ -76,7 +74,8 @@ constexpr uint64_t Rank8 = Rank1 << (8 * 7);
 constexpr uint8_t NoEP = 0;
 constexpr uint64_t All_SQ = ~0ULL;
 constexpr int CHECK_MATE = -0xFFFF;
-constexpr uint32_t CHECK_FLAG = 0x80;
+constexpr int BLACK = 5;
+constexpr int WHITE = 0;
 
 //---------CASTLING SQUARES--------------------------
 
@@ -148,9 +147,29 @@ struct Move {
 	}
 };
 
+inline int pext(uint64_t BB, uint64_t mask){
+	return _pext_u64(BB, mask);
+}
+
+inline int bitCount(uint64_t BB){
+	return __builtin_popcountll(BB);
+}
+
+inline int bitScan(uint64_t BB){
+	return __builtin_ctzll(BB);
+}
+
+template<Piece p>
+inline uint64_t pieces(const uint64_t pieces[]){
+	return pieces[p] | pieces[BLACK + p];
+}
+
+// #define bitCount(b) __builtin_popcountll(b)
+// #define bitScan(BB) __builtin_ctzll(BB)
+// #define pext(BB, mask) _pext_u64(BB, mask)
 
 template<bool white>
-inline const uint8_t getPiece(const uint64_t pieces[], const uint8_t sq) {
+inline uint8_t getPiece(const uint64_t pieces[], const uint8_t sq) {
 	const uint64_t fromBB = BB(sq);
 	for (int i = 5 * !white; i < 5 + 5 * !white; ++i) {
 		if (pieces[i] & fromBB)
@@ -241,8 +260,8 @@ constexpr uint8_t castlingModifiers[64] = {
 
 //---------------Bitboard functions------------------
    
-const void initLineBB(uint64_t (& lineBB)[64][64]);
-const uint64_t pinned_ray(int, int);
+void initLineBB(uint64_t (& lineBB)[64][64]);
+uint64_t pinned_ray(int, int);
 
 //------------------Files for init----------------------
 

@@ -21,13 +21,12 @@
 #include "../inc/attackPext.h"
 #include <cmath>
 
-#define PRINT_OUT
+//#define PRINT_OUT
 
-#define SHALLOW_SEARCH
+//#define SHALLOW_SEARCH
 
 
 Engine::Engine() {
-	std::cout << "ExplorerChess 1.0. Use help for a list of commands" << std::endl;
     _pos = {};
     nodes = 0;
     _moveGen = new MoveGen();
@@ -42,10 +41,12 @@ Engine::~Engine() {
 }
 
 void Engine::run() {
+    std::cout << "ExplorerChess 1.0. Use help for a list of commands" << std::endl;
     while (true) {
         runUI();
     }
 }
+
 
 
 void Engine::runUI() {
@@ -59,9 +60,12 @@ void Engine::runUI() {
 	std::string command = userInput.substr(0, commandEnd1);
     std::string arg = userInput.substr(commandEnd1 + 1, commandEnd2 - commandEnd1 - 1);
    
+	if (strcmp(command.c_str(), "testpos") == 0){
+        fenInit(_pos, "8/8/p1p5/1p5p/1P5p/8/PPP2K1p/4R1rk w - - 0 1");
+        //fenInit(_pos, "r1b1kb1r/pppp1ppp/5q2/4n3/3KP3/2N3PN/PPP4P/R1BQ1B1R b kq - 0 1");
+    }
 
-
-	if (strcmp(command.c_str(), "position") == 0){
+	else if (strcmp(command.c_str(), "position") == 0){
         
         if (strcmp(arg.c_str(), "startpos") == 0) {
             fenInit(_pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -96,7 +100,8 @@ void Engine::runUI() {
             move = analysis<false>(_pos, depth);
         }
         GUI::printMove(move.move);
-        std::cout << "\nNodes searched: " << nodes << "\nQnodes searched:" << qNodes << "\nEval: " << move.eval << std::endl;
+
+        std::cout << "\nNodes searched: " << nodes << "\nQnodes searched: " << qNodes << "\nEval: " << move.eval << std::endl;
     }
     else if (strcmp(command.c_str(), "hashTest") == 0) {
         MoveList ml;
@@ -145,7 +150,8 @@ void Engine::runUI() {
         }
     }
     else if (strcmp(command.c_str(), "state") == 0) {
-        GUI::printState(_pos.st);
+        const int score = _pos.whiteToMove ? _evaluation->evaluate<true>(_pos) : _evaluation->evaluate<false>(_pos);
+        std::cout << "Eval: " << score << " Score: " << _pos.st.materialScore << " Value: " << _pos.st.materialValue << "\n";
     }
     else if (strcmp(command.c_str(), "make") == 0) {
         MoveList ml;
@@ -304,7 +310,7 @@ uint64_t Engine::search(Position& pos, int depth) {
         return 1;
     
     MoveList move_list;
-    const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list);
+    const bool castleAllowed = _moveGen->generateAllMoves<whiteToMove>(pos, move_list, false);
     uint64_t numPositions = 0;
     for (int i = 0; i < move_list.size(); ++i) {
         doMove<whiteToMove, true>(pos, move_list.moves[i]);
@@ -324,7 +330,6 @@ uint64_t Engine::search(Position& pos, int depth) {
 template<bool whiteToMove>
 Move Engine::analysis(Position& pos, int depth) {
     _evalTransposition.clear();
-    pos.st.materialValue = _evaluation->materialValue(pos);
 
     MoveList move_list;
     const bool castle = _moveGen->generateAllMoves<whiteToMove>(pos, move_list, false);
@@ -336,7 +341,7 @@ Move Engine::analysis(Position& pos, int depth) {
     if (castle) {
         for (int i = 0; i < move_list.size(); ++i) {
             doMove<whiteToMove, true>(pos, move_list.moves[i]);
-            const int eval = -negaMax<!whiteToMove, true>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            const int eval = -negaMax<!whiteToMove, true>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth - 1);
             GUI::printMove(move_list.moves[i]);
             std::cout << " => Eval: " << eval << std::endl;
             if (eval > bestMove.eval) {
@@ -348,7 +353,7 @@ Move Engine::analysis(Position& pos, int depth) {
     else {
         for (int i = 0; i < move_list.size(); ++i) {
             doMove<whiteToMove, false>(pos, move_list.moves[i]);
-            const int eval = -negaMax<!whiteToMove, false>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth);
+            const int eval = -negaMax<!whiteToMove, false>(pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth - 1);
             GUI::printMove(move_list.moves[i]);
             std::cout << " => Eval: " << eval << std::endl;
             if (eval > bestMove.eval) {
@@ -365,13 +370,13 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
     //Negamax with alpha beta pruning
     nodes++;
     if (depth == 0) {
-        //return qSearch<whiteToMove>(pos, alpha, beta);
-        return _evaluation->evaluate<whiteToMove>(pos);
+        return qSearch<whiteToMove>(pos, alpha, beta);
+        //return _evaluation->evaluate<whiteToMove>(pos);
     }
 
-    //if (_evalTransposition.contains(pos.st.hashKey)) {
-      //  return _evalTransposition.at(pos.st.hashKey);
-    //}
+    if (_evalTransposition.contains(pos.st.hashKey)) {
+       return _evalTransposition.at(pos.st.hashKey);
+    }
     
     MoveList move_list;
 
@@ -398,7 +403,6 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
                 alpha = std::max(eval, alpha);
                 
             }
-            //_evalTransposition[pos.st.hashKey] = alpha;
             return alpha;
         }
 
@@ -412,18 +416,23 @@ int Engine::negaMax(Position& pos, int alpha, int beta, int depth) {
         }
         alpha = std::max(alpha, eval);
     }
-    //_evalTransposition[pos.st.hashKey] = alpha;
+    _evalTransposition[pos.st.hashKey] = alpha;
     return alpha;
 }
-
 
 template<bool whiteToMove>
 int Engine::qSearch(Position& pos, int alpha, int beta) {
     qNodes++;
+    int stand_pat = _evaluation->evaluate<whiteToMove>(pos);
+    if(stand_pat >= beta)
+        return beta;
+    if(alpha < stand_pat)
+        alpha = stand_pat;
+
     MoveList moveList;
     _moveGen->generateAllMoves<whiteToMove>(pos, moveList, true);
     if (moveList.size() == 0) {
-        return _evaluation->evaluate<whiteToMove>(pos);
+        return stand_pat;
     }
 
     for (int i = 0; i < moveList.size(); ++i) {
@@ -443,7 +452,6 @@ template<bool whiteToMove, bool castle>
 void Engine::moveIntegrity(Position& pos) {
     MoveList m;
     _moveGen->generateAllMoves<whiteToMove>(pos, m, false);
-    Position copy = pos;
     for (int i = 0; i < m.size(); ++i) {
         const int materialValue = pos.st.materialValue;
         const int materialScore = pos.st.materialScore;
@@ -556,8 +564,8 @@ void Engine::doMove(Position& pos, uint32_t move) {
             newHash ^= _zobristHash->epHash[(to + add) & 7]; //Add new ep hash
             break;
         case EP_CAPTURE:
-            pos.pieceBoards[enemyPawn] ^= BB(to + add);
-            pos.teamBoards[enemy] ^= BB(to + add);
+            pos.pieceBoards[enemyPawn] ^= BB((to + add));
+            pos.teamBoards[enemy] ^= BB((to + add));
             newHash ^= _zobristHash->pieceHash[enemyPawn][to + add]; // Remove pawn from hash
             pos.st.materialValue += scoreFavor * _evaluation->getPieceValue(captured + blackOffset);
             break;
@@ -605,123 +613,12 @@ void Engine::doMove(Position& pos, uint32_t move) {
 
     pos.st.hashKey = newHash;
     //Prepare for next movegeneration
-    _moveGen->findAttack<!whiteToMove>(pos);
+    pos.st.enemyAttack = _moveGen->findAttack<!whiteToMove>(pos);
     _moveGen->pinnedBoard<!whiteToMove>(pos);
     _moveGen->checks<!whiteToMove>(pos);
     _moveGen->setCheckSquares<!whiteToMove>(pos);
 }
 
-//Check list for undo move
-// - Reset state
-// - Move back piece
-// - If capture of normal or promotion add back piece to current side
-// - If ep capture add back pawn of current side
-// - If promotion remove piece and add back pawn
-
-
-
-
-
-
-/*
-template<bool whiteToMove, bool castle>
-void Engine::doMove(Position& pos, uint32_t move) {
-    //Save state info
-    prevStates.push(pos.st);
-
-
-    //Get move info
-    const uint8_t from = getFrom(move);
-    const uint8_t to = getTo(move);
-    const uint8_t mover = getMover(move);
-    //Captured will be 0 if there is no capture so important to do capture before move
-    const uint8_t captured = getCaptured(move);
-    const uint32_t flags = getFlags(move);
-    const uint64_t fromBB = BB(from);
-    const uint64_t toBB = BB(to);
-    const uint64_t capMask = toBB * (((flags & CAPTURE) == CAPTURE) && flags != EP_CAPTURE);
-
-    //Incrementally update position
-    if constexpr (whiteToMove) {
-        pos.teamBoards[1] ^= fromBB ^ toBB;
-        pos.teamBoards[2] ^= capMask;
-        pos.st.enPassant = (flags == DOUBLE_PUSH) * (to + 8);
-    }
-    else {
-        pos.teamBoards[2] ^= fromBB ^ toBB;
-        pos.teamBoards[1] ^= capMask;
-        pos.st.enPassant = (flags == DOUBLE_PUSH) * (to - 8);
-    }
-    pos.pieceBoards[captured] ^= capMask;
-
-
-    if (mover == King) {
-        if constexpr (whiteToMove) {
-            pos.kings[0] = to;
-        }
-        else {
-            pos.kings[1] = to;
-        }
-        if constexpr (castle) {
-            if (flags == CASTLE_KING) {
-                doCastle<whiteToMove, true>(pos);
-            }
-            else if (flags == CASTLE_QUEEN) {
-                doCastle<whiteToMove, false>(pos);
-            }
-        }
-    }
-    else {
-        pos.pieceBoards[mover] ^= fromBB ^ toBB;
-
-        //EP: remove pawn if there is a EP capture and update ep if there is a double push
-        //And promotions
-
-        if constexpr (whiteToMove) {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to + 8);
-            pos.pieceBoards[5] ^= ep_cap;
-            pos.teamBoards[2] ^= ep_cap;
-
-        }
-        else {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to - 8);
-            pos.pieceBoards[0] ^= ep_cap;
-            pos.teamBoards[1] ^= ep_cap;
-
-        }
-
-
-
-        if ((flags & PROMO_N) != 0) {
-            if constexpr (whiteToMove) {
-                pos.pieceBoards[0] ^= toBB;
-                pos.pieceBoards[1 + getPromo(move)] |= toBB;
-            }
-            else {
-                pos.pieceBoards[5] ^= toBB;
-                pos.pieceBoards[6 + getPromo(move)] |= toBB;
-            }
-        }
-    }
-    if constexpr (castle) {
-        //Handles if rook is captured or moves
-        pos.st.castlingRights &= castlingModifiers[from];
-        pos.st.castlingRights &= castlingModifiers[to];
-        //TODO: capture of rook needs to update castle hash
-    }
-
-
-    //Restore occupied
-    pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
-
-    pos.whiteToMove = !whiteToMove;
-
-    //Prepare for next movegeneration
-    _moveGen->findAttack<!whiteToMove>(pos);
-    _moveGen->pinnedBoard<!whiteToMove>(pos);
-    _moveGen->checks<!whiteToMove>(pos);
-}
-*/
 
 template<bool whiteToMove, bool castle>
 void Engine::undoMove(Position& pos, uint32_t move) {
@@ -772,12 +669,12 @@ void Engine::undoMove(Position& pos, uint32_t move) {
 
         //EP: add the ep pawn if there was an ep capture
         if constexpr (whiteToMove) {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to - 8);
+            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB((to - 8));
             pos.pieceBoards[0] ^= ep_cap;
             pos.teamBoards[1] ^= ep_cap;
         }
         else {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to + 8);
+            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB((to + 8));
             pos.pieceBoards[5] ^= ep_cap;
             pos.teamBoards[2] ^= ep_cap;
         }
@@ -966,18 +863,19 @@ void Engine::fenInit(Position& pos, std::string fen) {
     if (pos.whiteToMove) {
         _moveGen->pinnedBoard<true>(pos);
         _moveGen->checks<true>(pos);
-        _moveGen->findAttack<true>(pos);
+        pos.st.enemyAttack = _moveGen->findAttack<true>(pos);
     }
     else {
         _moveGen->pinnedBoard<false>(pos);
         _moveGen->checks<false>(pos);
-        _moveGen->findAttack<false>(pos);
+        pos.st.enemyAttack = _moveGen->findAttack<false>(pos);
     }
     pos.ply = 0;
     pos.st.hashKey = _zobristHash->hashPosition(pos);
-    pos.st.materialScore = _evaluation->materialValue(pos);
+    pos.st.materialScore = _evaluation->initMaterialValue(pos);
     pos.st.materialValue = _evaluation->staticPieceEvaluation(pos.pieceBoards);
 }
+
 
 
 void Engine::tests()
@@ -987,45 +885,46 @@ void Engine::tests()
     int testNr = 1;
     double totalTime = 0.0;
     
-    auto test = [&](const char* str,
-        uint64_t count, uint8_t perftLevel = 6) -> double {
-            using namespace std;
+    auto test = [&](const char* str, uint64_t count, uint8_t perftLevel = 6) -> double {
+        using namespace std;
 
-            cout << "\nRunning test: " << testNr << endl;
-            fenInit(pos, str);
-            auto start = chrono::system_clock::now();
-            uint64_t perftCount;
-            if(pos.whiteToMove){
-                perftCount = Engine::perft<true>(pos, perftLevel);
-            }
-            else{
-                perftCount = Engine::perft<false>(pos, perftLevel);    
-            } 
-            auto end = chrono::system_clock::now();
-            chrono::duration<double> elapsed_time = end - start;
-            double kN = static_cast<double>(perftCount) / elapsed_time.count() / 1000;
-            totalTime += elapsed_time.count();
-            cout << "Time: " << elapsed_time.count() << "s" << endl;
-            cout << "KN/s: "
-                << static_cast<double>(perftCount) / elapsed_time.count() / 1000
-                << endl;
-            cout << "Perft depth: " << (int)perftLevel << endl;
+        cout << "\nRunning test: " << testNr << endl;
+        
+        auto start = chrono::system_clock::now();
+        uint64_t perftCount;
+        if(pos.whiteToMove){
+            perftCount = Engine::perft<true>(pos, perftLevel);
+        }
+        else{
+            perftCount = Engine::perft<false>(pos, perftLevel);    
+        } 
+        auto end = chrono::system_clock::now();
+        chrono::duration<double> elapsed_time = end - start;
+        double kN = static_cast<double>(perftCount) / elapsed_time.count() / 1000;
+        totalTime += elapsed_time.count();
+        cout << "Time: " << elapsed_time.count() << "s" << endl;
+        cout << "KN/s: "
+            << static_cast<double>(perftCount) / elapsed_time.count() / 1000
+            << endl;
+        cout << "Perft depth: " << (int)perftLevel << endl;
 
-            if (count != perftCount)
-            {
-                cout << "Test " << testNr
-                    << " failed, expected:" << count
-                    << " got: " << perftCount << endl
-                    << "Fen: " << str << endl;
-                fail = true;
-            }
-            else
-            {
-                cout << "Test " << testNr << " success!" << endl;
-            }
-            testNr++;
-            return kN;
+        if (count != perftCount)
+        {
+            cout << "Test " << testNr
+                << " failed, expected:" << count
+                << " got: " << perftCount << endl
+                << "Fen: " << str << endl;
+            fail = true;
+        }
+        else
+        {
+            cout << "Test " << testNr << " success!" << endl;
+        }
+        testNr++;
+        return kN;
     };
+
+            
     auto geometric_mean = [&](std::vector<double> const& data) -> double
     {
         double m = 1.0;
@@ -1047,31 +946,7 @@ void Engine::tests()
     std::vector<double> results;
 
 
-    results.push_back(test("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 119060324ULL, 6));
 
-    
-    results.push_back(test("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ", 193690690ULL, 5));
-    results.push_back(test("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ", 11030083ULL, 6));
-    results.push_back(test("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 706045033ULL, 6));
-    results.push_back(test("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 3048196529ULL, 6));
-
-    //Veri long test results.push_back(test("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ", 6923051137ULL, 6));
-    results.push_back(test("8/8/4k3/8/2p5/8/B2P2K1/8 w - - 0 1", 102503850ULL, 8));
-    results.push_back(test("3k4/3p4/8/K1P4r/8/8/8/8 b - - 0 1", 130459988ULL, 8));
-    //results.push_back(test("8/8/1k6/2b5/2pP4/8/5K2/8 b - d3 0 1", 1440467ULL, 6));
-    results.push_back(test("5k2/8/8/8/8/8/8/4K2R w K - 0 1", 73450134ULL, 8));
-    results.push_back(test("3k4/8/8/8/8/8/8/R3K3 w Q - 0 1", 91628014ULL, 8));
-
-    results.push_back(test("r3k2r/1b4bq/8/8/8/8/7B/R3K2R w KQkq - 0 1", 1509218880ULL, 6));
-    results.push_back(test("r3k2r/8/3Q4/8/8/5q2/8/R3K2R b KQkq - 0 1", 2010267707ULL, 6));
-    results.push_back(test("2K2r2/4P3/8/8/8/8/8/3k4 w - - 0 1", 905613447ULL, 8));
-    results.push_back(test("8/8/1P2K3/8/2n5/1q6/8/5k2 b - - 0 1", 197013195ULL, 7));
-    results.push_back(test("4k3/1P6/8/8/8/8/K7/8 w - - 0 1", 397481663ULL, 9));
-
-    results.push_back(test("8/P1k5/K7/8/8/8/8/8 w - - 0 1", 153850274ULL, 9));
-    results.push_back(test("K1k5/8/P7/8/8/8/8/8 w - - 0 1", 85822924ULL, 11));
-    results.push_back(test("8/k1P5/8/1K6/8/8/8/8 w - - 0 1", 173596091ULL, 10));
-    results.push_back(test("8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1", 104644508ULL, 7));
 
     const double geo_mean = geometric_mean(results);
     std::cout << "Average kN/s: " << geo_mean << std::endl;
@@ -1080,4 +955,3 @@ void Engine::tests()
         std::cout << "Current build cleared all tests in " << totalTime << " s" << std::endl; 
     }
 }
-

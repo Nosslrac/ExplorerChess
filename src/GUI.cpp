@@ -177,11 +177,22 @@ namespace GUI {
 	uint32_t findMove(MoveList& ml, std::string move) noexcept {
 		int from = (move.at(0) - 'a') + (8 - move.at(1) + '0') * 8;
 		int to = (move.at(2) - 'a') + (8 - move.at(3) + '0') * 8;
-
+		int8_t promo = 0;
+		bool skipPromo = true;
+		if(move.length() >= 5){
+			switch(move.at(4)){
+				case 'b': promo = 1; break;
+				case 'r': promo = 2; break;
+				case 'q': promo = 3; break;
+			}
+			skipPromo = false; 
+		}
 		for (int i = 0; i < ml.size(); ++i) {
 			const uint32_t curr = ml.moves[i];
 			if (getFrom(curr) == from && getTo(curr) == to) {
-				return curr;
+				if(skipPromo || getPromo(curr) == promo){
+					return curr;
+				}
 			}
 		}
 		return 0;

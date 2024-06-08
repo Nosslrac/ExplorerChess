@@ -1,8 +1,12 @@
-#pragma once
-#include "attacks.h"
-#include "bitboardUtil.h"
-#include "attackPext.h"
 #define PEXT
+
+#pragma once
+#ifdef PEXT
+#include "attackPext.h"
+#else
+#include "attacks.h"
+#endif
+#include "bitboardUtil.h"
 
 
 #ifdef PEXT
@@ -13,26 +17,26 @@ class MoveGen : magicalBits::MagicalBitboards{
 public:
 	MoveGen();
 	template<bool whiteToMove>
-	const bool generateAllMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
+	bool generateAllMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool castling, bool pins, bool enPassant>
-	const void generateMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
+	void generateMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool castling>
-	const void generateKingMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
+	void generateKingMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool pins, bool enPassent>
-	const void generatePawnMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
+	void generatePawnMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	template<bool whiteToMove, bool pins>
-	const void generateKnightMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
+	void generateKnightMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 	
 	template<bool whiteToMove, Piece p, bool pins>
-	const void generatePieceMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
+	void generatePieceMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const;
 
 	//Move to private when working
 	template<Piece p>
-	inline const uint64_t stepAttackBB(uint8_t square) const{
+	inline uint64_t stepAttackBB(uint8_t square) const{
 		static_assert(p == Knight || p == King);
 		if constexpr (p == Knight) {
 			return knightLookUp[square];
@@ -43,7 +47,7 @@ public:
 	}
 	
 	template<Piece p>
-	inline const uint64_t attackBB(const uint64_t board, const uint8_t square) const {
+	inline uint64_t attackBB(const uint64_t board, const uint8_t square) const {
 		if constexpr (p == Bishop) {
 			return bishopAttack(board, square);
 		}
@@ -58,66 +62,67 @@ public:
 	
 	//Checks and pins
 	template<bool whiteToMove>
-	const void pinnedBoard(Position& pos);
+	void pinnedBoard(Position& pos);
+	
 	template<bool whiteToMove>
-	const void checks(Position& pos);
+	void checks(Position& pos);
+	
 	template<bool whiteToMove>
-	const void findAttack(Position& pos);
+	uint64_t findAttack(const Position& pos) const noexcept;
+	
 	template<bool whiteToMove>
-	const void setCheckSquares(Position& pos) const;
+	void setCheckSquares(Position& pos) const;
+	
+	uint64_t attackersTo(uint8_t sq, const Position& pos) const;
 
 private:
 
 	template<Piece p>
-	const uint64_t pieceAttack(uint64_t board, uint64_t pieces) const;
+	uint64_t pieceAttack(uint64_t board, uint64_t pieces) const;
 	template<Piece p>
-	const uint64_t stepAttack(uint64_t pieces) const;
+	uint64_t stepAttack(uint64_t pieces) const;
 
 
 	template<bool isPromotion>
-	const inline void constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPiece) const;
-
-	template<bool whiteToMove, bool enPassent>
-	const void pinnedPawns(const Position& pos, MoveList& move_list, uint64_t pinned) const;
-	
+	inline void constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPiece) const;
 
 	template<bool whiteToMove, bool pins>
-	const void enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP) const;
+	void enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP) const;
 
 
 	template<bool pin, bool isPromotion>
-	const void makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPiece) const;
+	void makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPiece) const;
 
 	template<bool whiteToMove, bool pin, bool isPromotion>
-	const inline void makePawnCapture(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const;
+	inline void makePawnCapture(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const;
 	
-	const inline void makePieceMove(MoveList& move_list, uint64_t toSQs, uint8_t back, uint32_t flagAndPiece) const;
+	inline void makePieceMove(MoveList& move_list, uint64_t toSQs, uint8_t back, uint32_t flagAndPiece) const;
 
 	template<bool whiteToMove>
-	const inline void makeCaptureMove(const uint64_t pieceBoards[], MoveList& move_list, uint64_t toSQs, uint8_t back, uint32_t flagAndPiece) const;
+	inline void makeCaptureMove(const uint64_t pieceBoards[], MoveList& move_list, uint64_t toSQs, uint8_t back, uint32_t flagAndPiece) const;
 
 
 	//------------------Helper lookups------------------------------
 
 
 	#ifdef PEXT
-	inline const uint64_t rookAttack(uint64_t board, uint8_t square) const{
+	inline uint64_t rookAttack(uint64_t board, uint8_t square) const{
 		return rookAttackPtr[square][pext(board, rookBits[square])];
 	}
 
-	inline const uint64_t bishopAttack(uint64_t board, uint8_t square) const{
+	inline uint64_t bishopAttack(uint64_t board, uint8_t square) const{
 		return bishopAttackPtr[square][pext(board, bishopBits[square])];
 	}
 
 	#else
-	inline const uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
+	inline uint64_t MoveGen::bishopAttack(uint64_t board, uint8_t square) const{
 		board &= m_bishopMasks[square];
 		board *= m_bishopMagicBitboard[square];
 		board >>= (64 - m_occupacyCountBishop[square]);
 		return m_bishopAttacks[square][board];
 	}
 
-	inline const uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
+	inline uint64_t MoveGen::rookAttack(uint64_t board, uint8_t square) const{
 		board &= m_rookMasks[square];
 		board *= m_rookMagicBitboard[square];
 		board >>= (64 - m_occupacyCountRook[square]);
@@ -167,7 +172,7 @@ private:
 
 
 	template<Piece p>
-	const inline uint64_t emptyAttack(uint8_t sq) const{
+	inline uint64_t emptyAttack(uint8_t sq) const{
 		if constexpr (p == Bishop) {
 			return attackBB<Bishop>(0, sq);
 		}
@@ -176,10 +181,12 @@ private:
 		}
 	}
 
-	const inline uint64_t betweenBB(uint8_t sq1, uint8_t sq2) const{
+	inline uint64_t betweenBB(uint8_t sq1, uint8_t sq2) const{
 		uint64_t b = LineBB[sq1][sq2] & ((All_SQ << sq1) ^ (All_SQ << sq2));
 		return b & (b - 1); //exclude lsb
 	}
+
+	
 
 
 

@@ -231,7 +231,7 @@ namespace magicalBits
     {
         for (uint32_t square = 0; square < 64; square++)
         {
-            std::printf(" 0x%llxULL,\n", findMagicNumber(square, m_occupacyCountRook[square], maskRookAttacks, maskRookAttacksWithBlock));
+            std::printf(" 0x%lxULL,\n", findMagicNumber(square, m_occupacyCountRook[square], maskRookAttacks, maskRookAttacksWithBlock));
         }
     }
 

@@ -12,7 +12,7 @@ MoveGen::MoveGen(){
 //--------------------Move generation-----------------------------------------
 
 template<bool whiteToMove, bool castling, bool pins, bool enPassant>
-const void MoveGen::generateMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const{
+void MoveGen::generateMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const{
 	if (bitCount(pos.st.checkers) < 2) {
 		generatePawnMoves<whiteToMove, pins, enPassant>(pos, move_list, onlyCapture);
 		generateKnightMoves<whiteToMove, pins>(pos, move_list, onlyCapture);
@@ -27,7 +27,7 @@ const void MoveGen::generateMoves(const Position& pos, MoveList& move_list, cons
 
 
 template<bool whiteToMove>
-const bool MoveGen::generateAllMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const{
+bool MoveGen::generateAllMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const{
 
 	constexpr uint8_t shift = (2 * !whiteToMove);
 	const uint8_t castling = static_cast<bool>(0b11 & (pos.st.castlingRights >> shift)) * 0b100;
@@ -49,7 +49,7 @@ const bool MoveGen::generateAllMoves(const Position& pos, MoveList& move_list, c
 
 
 template<bool whiteToMove, bool castling>
-const void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
+void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
 	//CHANGE KING, he is not a bitboard any more
 	constexpr uint32_t mover = (King + !whiteToMove) << 24;
 
@@ -93,8 +93,7 @@ const void MoveGen::generateKingMoves(const Position& pos, MoveList& move_list, 
 
 //TODO: maybe inline makePawnMove, it is not that long
 template<bool whiteToMove, bool pins, bool enPassant>
-const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
-	constexpr bool them = !whiteToMove;
+void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
 	constexpr uint64_t promoRank = whiteToMove ? Rank2 : Rank7;
 	constexpr uint64_t doublePotential = whiteToMove ? Rank6 : Rank3;
 	constexpr int8_t back = whiteToMove ? 8 : -8;
@@ -151,7 +150,7 @@ const void MoveGen::generatePawnMoves(const Position& pos, MoveList& move_list, 
 
 
 template<bool whiteToMove, Piece p, bool pins>
-const void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
+void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
 	constexpr uint32_t pID = whiteToMove ? p << 24 : (p + 5) << 24;
 	uint64_t bishops = getPieces<whiteToMove, p>(pos);
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
@@ -174,7 +173,7 @@ const void MoveGen::generatePieceMoves(const Position& pos, MoveList& move_list,
 }
 
 template<bool whiteToMove, bool pins>
-const void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
+void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list, const bool onlyCapture) const {
 	constexpr uint32_t pID = whiteToMove ? Knight << 24 : (Knight + 5) << 24;
 	uint64_t knights = getPieces<whiteToMove, Knight>(pos);
 	const uint64_t enemy = pos.teamBoards[2 - !whiteToMove];
@@ -198,7 +197,7 @@ const void MoveGen::generateKnightMoves(const Position& pos, MoveList& move_list
 
 
 template<bool whiteToMove, bool pins>
-const void MoveGen::enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP) const{
+void MoveGen::enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP) const{
 	//TODO: check on rank still allows EP, veri bad
 	constexpr uint32_t pID = whiteToMove ? 0 << 24 : 5 << 24;
 	constexpr uint64_t EPrank = whiteToMove ? Rank4 : Rank5;
@@ -237,7 +236,7 @@ const void MoveGen::enPassantMoves(const Position& pos, MoveList& ml, uint8_t EP
 
 
 template<bool isPromotion>
-const inline void MoveGen::constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPieces) const{
+inline void MoveGen::constructMove(MoveList& move_list, uint8_t from, uint8_t to, uint32_t flagAndPieces) const{
 	if constexpr (isPromotion) {
 		move_list.add(to | (from << 8) | PROMO_Q | flagAndPieces);
 		move_list.add(to | (from << 8) | PROMO_R | flagAndPieces);
@@ -248,7 +247,7 @@ const inline void MoveGen::constructMove(MoveList& move_list, uint8_t from, uint
 }
 
 template<bool pin, bool isPromotion>
-const inline void MoveGen::makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const {
+inline void MoveGen::makePawnMove(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const {
 	unsigned long toSQ;
 	while (toSQs) {
 		toSQ = bitScan(toSQs);
@@ -268,7 +267,7 @@ const inline void MoveGen::makePawnMove(const Position& pos, MoveList& move_list
 }
 
 template<bool whiteToMove, bool pin, bool isPromotion>
-const inline void MoveGen::makePawnCapture(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const{
+inline void MoveGen::makePawnCapture(const Position& pos, MoveList& move_list, uint64_t toSQs, int8_t back, uint32_t flagAndPieces) const{
 	unsigned long toSQ;
 	while (toSQs) {
 		toSQ = bitScan(toSQs);
@@ -289,7 +288,7 @@ const inline void MoveGen::makePawnCapture(const Position& pos, MoveList& move_l
 }
 
 
-const inline void MoveGen::makePieceMove(MoveList& move_list, uint64_t toSQs, uint8_t from, uint32_t flagAndPieces) const {
+inline void MoveGen::makePieceMove(MoveList& move_list, uint64_t toSQs, uint8_t from, uint32_t flagAndPieces) const {
 	unsigned long toSQ;
 	while (toSQs) {
 		toSQ = bitScan(toSQs);
@@ -299,7 +298,7 @@ const inline void MoveGen::makePieceMove(MoveList& move_list, uint64_t toSQs, ui
 }
 
 template<bool whiteToMove>
-const inline void MoveGen::makeCaptureMove(const uint64_t pieceBoards[], MoveList& move_list, uint64_t toSQs, uint8_t from, uint32_t flagAndPiece) const {
+inline void MoveGen::makeCaptureMove(const uint64_t pieceBoards[], MoveList& move_list, uint64_t toSQs, uint8_t from, uint32_t flagAndPiece) const {
 	unsigned long toSQ;
 	while (toSQs) {
 		toSQ = bitScan(toSQs);
@@ -315,7 +314,7 @@ const inline void MoveGen::makeCaptureMove(const uint64_t pieceBoards[], MoveLis
 //--------------------Pins and checks-------------------------------------
 
 template<bool whiteToMove>
-const void MoveGen::checks(Position& pos){
+void MoveGen::checks(Position& pos){
 	uint64_t checkers = 0;
 	const uint8_t king = pos.kings[!whiteToMove];
 
@@ -334,7 +333,7 @@ const void MoveGen::checks(Position& pos){
 }
 
 template<bool whiteToMove>
-const void MoveGen::setCheckSquares(Position& pos) const{
+void MoveGen::setCheckSquares(Position& pos) const{
 	const uint8_t enemyKing = pos.kings[!whiteToMove];
 	pos.checkSquares[0] = pawnAttackBB<!whiteToMove>(BB(enemyKing));
 	pos.checkSquares[1] = knightLookUp[enemyKing];
@@ -348,7 +347,7 @@ const void MoveGen::setCheckSquares(Position& pos) const{
 *	TODO: find blocker for king to detect discovered checks
 */
 template<bool whiteToMove>
-const void MoveGen::pinnedBoard(Position& pos){
+void MoveGen::pinnedBoard(Position& pos){
 	uint64_t pinned = 0ULL;
 	uint64_t blockForKing = 0ULL;
 	uint64_t checkers = 0ULL;
@@ -386,7 +385,7 @@ const void MoveGen::pinnedBoard(Position& pos){
 }
 
 template<bool whiteToMove>
-const void MoveGen::findAttack(Position& pos) {
+uint64_t MoveGen::findAttack(const Position& pos) const noexcept{
 	uint64_t attack = 0;
 	if constexpr (whiteToMove) {
 		const uint64_t board_noKing = pos.teamBoards[0] ^ BB(pos.kings[0]);
@@ -404,7 +403,7 @@ const void MoveGen::findAttack(Position& pos) {
 		attack |= kingLookUp[pos.kings[0]];
 		attack |= shift<true, UP_LEFT>(pos.pieceBoards[0]) | shift<true, UP_RIGHT>(pos.pieceBoards[0]);
 	}
-	pos.st.enemyAttack = attack;
+	return attack;
 }
 
 
@@ -415,20 +414,20 @@ const void MoveGen::findAttack(Position& pos) {
 
 //Template instanciation (remove later when they are actually called)
 
-template const void MoveGen::pinnedBoard<true>(Position&);
-template const void MoveGen::pinnedBoard<false>(Position&);
-template const void MoveGen::checks<true>(Position&);
-template const void MoveGen::checks<false>(Position&);
-template const void MoveGen::findAttack<true>(Position&);
-template const void MoveGen::findAttack<false>(Position&);
-template const void MoveGen::setCheckSquares<true>(Position&) const;
-template const void MoveGen::setCheckSquares<false>(Position&) const;
+template void MoveGen::pinnedBoard<true>(Position&);
+template void MoveGen::pinnedBoard<false>(Position&);
+template void MoveGen::checks<true>(Position&);
+template void MoveGen::checks<false>(Position&);
+template uint64_t MoveGen::findAttack<true>(const Position&) const;
+template uint64_t MoveGen::findAttack<false>(const Position&) const;
+template void MoveGen::setCheckSquares<true>(Position&) const;
+template void MoveGen::setCheckSquares<false>(Position&) const;
 
-template const bool MoveGen::generateAllMoves<true>(const Position&, MoveList&, const bool) const;
-template const bool MoveGen::generateAllMoves<false>(const Position&, MoveList&, const bool) const;
+template bool MoveGen::generateAllMoves<true>(const Position&, MoveList&, const bool) const;
+template bool MoveGen::generateAllMoves<false>(const Position&, MoveList&, const bool) const;
 
-template const uint64_t MoveGen::attackBB<Rook>(uint64_t board, uint8_t square) const;
-template const uint64_t MoveGen::attackBB<Bishop>(uint64_t board, uint8_t square) const;
+template uint64_t MoveGen::attackBB<Rook>(uint64_t board, uint8_t square) const;
+template uint64_t MoveGen::attackBB<Bishop>(uint64_t board, uint8_t square) const;
 
 
 
@@ -438,7 +437,7 @@ template const uint64_t MoveGen::attackBB<Bishop>(uint64_t board, uint8_t square
 //////////////////////////////////////////////////////////////////
 
 template<Piece p>
-const uint64_t MoveGen::pieceAttack(uint64_t board, uint64_t pieces) const{
+uint64_t MoveGen::pieceAttack(uint64_t board, uint64_t pieces) const{
 	uint64_t attack = 0;
 	unsigned long fromSQ;
 	while (pieces) {
@@ -450,7 +449,7 @@ const uint64_t MoveGen::pieceAttack(uint64_t board, uint64_t pieces) const{
 }
 
 template<Piece p>
-const uint64_t MoveGen::stepAttack(uint64_t pieces) const {
+uint64_t MoveGen::stepAttack(uint64_t pieces) const {
 	uint64_t attack = 0;
 	unsigned long fromSQ;
 	while (pieces) {
@@ -459,6 +458,17 @@ const uint64_t MoveGen::stepAttack(uint64_t pieces) const {
 		attack |= stepAttackBB<p>(fromSQ);
 	}
 	return attack;
+}
+
+
+uint64_t MoveGen::attackersTo(uint8_t sq, const Position& pos) const{
+	const uint64_t sqBB = BB(sq);
+	const uint64_t board = pos.teamBoards[0];
+	return (pawnAttackBB<true>(sqBB) & pos.pieceBoards[WHITE])
+		 | (pawnAttackBB<false>(sqBB) & pos.pieceBoards[BLACK])
+		 | (stepAttackBB<Knight>(sq) & pieces<Knight>(pos.pieceBoards))
+		 | (attackBB<Bishop>(board, sq) & (pieces<Bishop>(pos.pieceBoards) | pieces<Queen>(pos.pieceBoards)))
+		 | (attackBB<Rook>(board, sq) & (pieces<Rook>(pos.pieceBoards) | pieces<Queen>(pos.pieceBoards)));
 }
 
 

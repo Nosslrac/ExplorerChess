@@ -11,34 +11,36 @@ public:
 	~Evaluation() = default;
 
 	template<bool whiteToMove>
-	const int evaluate(const Position& pos) const;
+	int evaluate(const Position& pos) const;
 
-	inline const int pieceScoreChange(int8_t from, int8_t to, int8_t mover) const{
+	inline int pieceScoreChange(int8_t from, int8_t to, int8_t mover) const{
 		return PSTs[mover][to] - PSTs[mover][from];
 	}
 
-	inline const int pieceScore(int8_t sq, int8_t mover) const{
+	inline int pieceScore(int8_t sq, int8_t mover) const{
 		return PSTs[mover][sq];
 	}
 
-	inline const int getPieceValue(int8_t index){
+	inline int getPieceValue(int8_t index){
 		return pieceValue[index];
 	}
 
 	//Material balance
-	const int materialValue(const Position& pos) const;
-	const int staticPieceEvaluation(const uint64_t piece[10]) const;
+	int initMaterialValue(const Position& pos) const;
+	int staticPieceEvaluation(const uint64_t piece[10]) const;
 private:
-	const uint16_t pieceValue[5] = {100, 300, 300, 500, 900};
+	uint16_t pieceValue[5] = {100, 300, 300, 500, 900};
 
 
 
+	template<bool whiteToMove>
+	int undefendedPieces(const Position& pos) const;
 
 	//Static pawn structure evaluation, to be stored in a lookup table
 	//- Isolated pawns
 	//- Passed pawns (+ if it is protected by another pawn)
 	template<bool whiteToMove>
-	const int passedPawns(const uint64_t piece[10]) const;
+	int passedPawns(const uint64_t piece[10]) const;
 
 	
 	
@@ -48,14 +50,14 @@ private:
 
 	//Attacking potential
 	template<bool whiteToMove>
-	const int attackPotential(const uint64_t piece[10]) const;
+	int attackPotential(const uint64_t piece[10]) const;
 
 	robin_hood::unordered_map<uint64_t, int> pawnStructure;
 
 	//King safety (use some kind of pext for surrounding squares and then switch case maybe)
 	//Also open lines based on oponents sliding pieces potential penalty
 	template<bool whiteToMove>
-	const int kingSafety(const Position& pos) const;
+	int kingSafety(const Position& pos) const;
 
 	//Undefended pieces penalty
 

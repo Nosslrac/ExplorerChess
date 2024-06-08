@@ -14,7 +14,7 @@
 
 
 
-const void initLineBB(uint64_t (&lineBB)[64][64]) {
+void initLineBB(uint64_t (&lineBB)[64][64]) {
 	for (int i = 0; i < 64; ++i) {
 		for (int j = 0; j < 64; ++j)
 			lineBB[i][j] = pinned_ray(i, j);
@@ -25,7 +25,7 @@ const void initLineBB(uint64_t (&lineBB)[64][64]) {
 
 
 //Find the ray in which the piece is able to move
-const uint64_t pinned_ray(int king, int piece) {
+uint64_t pinned_ray(int king, int piece) {
 	//On the same rank
 	if (king / 8 == piece / 8)
 		return ranks[king / 8];
@@ -43,6 +43,6 @@ const uint64_t pinned_ray(int king, int piece) {
 }
 
 
-template const uint8_t getPiece<false>(const uint64_t[], uint8_t);
+template uint8_t getPiece<false>(const uint64_t[], uint8_t);
 
-template const uint8_t getPiece<true>(const uint64_t[], uint8_t);
+template uint8_t getPiece<true>(const uint64_t[], uint8_t);

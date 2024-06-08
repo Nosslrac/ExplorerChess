@@ -8,8 +8,6 @@
 #include <cassert>
 #include <chrono>
 #include <iostream>
-#include <unordered_map>
-#include <queue>
 #include "evaluate.h"
 #include "moveOrdering.h"
 #include "robin_hood.h"
@@ -21,12 +19,14 @@ public:
 
 	void run();
 
+	template<bool whiteToMove>
+	uint64_t perft(Position& pos, int depth);
+	//Init position
+	void fenInit(Position&, std::string);
 private:
 	//API
 	void runUI();
 	
-	//Init position
-	void fenInit(Position&, std::string);
 
 	//Making moves
 	template<bool whiteToMove, bool castle>
@@ -43,8 +43,6 @@ private:
 	
 
 	//Perft
-	template<bool whiteToMove>
-	uint64_t perft(Position& pos, int depth);
 	template<bool whiteToMove, bool castle>
 	uint64_t search(Position& pos, int depth);
 
@@ -70,6 +68,7 @@ private:
 	ZobristHash* _zobristHash;
 	uint64_t nodes;
 	uint64_t qNodes;
+	uint64_t qNodeMoves;
 	Evaluation* _evaluation;
 	
 	
