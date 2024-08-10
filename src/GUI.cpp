@@ -1,4 +1,4 @@
-#include "../inc/GUI.h"
+#include "GUI.h"
 namespace GUI {
 	void print_bit_board(uint64_t b) {
 
@@ -175,9 +175,9 @@ namespace GUI {
 	}
 
 	uint32_t findMove(MoveList& ml, std::string move) noexcept {
-		int from = (move.at(0) - 'a') + (8 - move.at(1) + '0') * 8;
-		int to = (move.at(2) - 'a') + (8 - move.at(3) + '0') * 8;
-		int8_t promo = 0;
+		uint32_t from = (move.at(0) - 'a') + (8 - move.at(1) + '0') * 8;
+		uint32_t to = (move.at(2) - 'a') + (8 - move.at(3) + '0') * 8;
+		uint8_t promo = 0;
 		bool skipPromo = true;
 		if(move.length() >= 5){
 			switch(move.at(4)){

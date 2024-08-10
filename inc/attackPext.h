@@ -1,5 +1,5 @@
 #pragma once
-#include "../inc/bitboardUtil.h"
+#include "bitboardUtil.h"
 
 namespace PEXT_ATTACK{
     //API

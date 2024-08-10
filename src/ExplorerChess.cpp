@@ -1,7 +1,7 @@
-#include "../inc/Engine.h"
+#include "Engine.h"
 
-int main()
-{
-	std::unique_ptr<Engine> engine = std::make_unique<Engine>();
-	engine->run();
+int main() {
+  Engine engine;
+  engine.run();
+  return 0;
 }

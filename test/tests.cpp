@@ -3,15 +3,13 @@
 #include "catch.hpp"
 
 
-#include "../inc/Engine.h"
+#include "Engine.h"
 
 
 TEST_CASE("Example test case") {
     REQUIRE(1 + 1 == 2);
 }
 
-// #include "../inc/bitboardUtil.h"
-// #include "../inc/Engine.h"
 
 
 bool testPos(Engine& engine, std::string fen, const uint64_t count,  const int depth){

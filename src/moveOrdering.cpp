@@ -1,4 +1,4 @@
-#include "../inc/moveOrdering.h"
+#include "moveOrdering.h"
 
 
 void MoveOrder::moveSort(MoveList& move_list, const Position&, int){

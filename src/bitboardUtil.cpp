@@ -1,4 +1,4 @@
-#include "../inc/bitboardUtil.h"
+#include "bitboardUtil.h"
 
 
 
