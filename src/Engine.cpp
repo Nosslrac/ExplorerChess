@@ -97,9 +97,9 @@ void Engine::runUI() {
   } else if (strcmp(command.c_str(), "hashTest") == 0) {
     MoveList ml;
     if (m_pos.whiteToMove)
-      m_moveGen.generateAllMoves<true>(m_pos, ml, false);
+      m_moveGen.generateAllMoves<true, false>(m_pos, ml);
     else
-      m_moveGen.generateAllMoves<false>(m_pos, ml, false);
+      m_moveGen.generateAllMoves<false, false>(m_pos, ml);
 
     for (int i = 0; i < ml.size(); ++i) {
       if (m_pos.whiteToMove) {
@@ -143,14 +143,14 @@ void Engine::runUI() {
   } else if (strcmp(command.c_str(), "make") == 0) {
     MoveList ml;
     if (m_pos.whiteToMove) {
-      m_moveGen.generateAllMoves<true>(m_pos, ml, false);
+      m_moveGen.generateAllMoves<true, false>(m_pos, ml);
       const uint32_t move = GUI::findMove(ml, arg);
       if (move != 0) {
         prevMoves.push(move);
         doMove<true, true>(m_pos, move);
       }
     } else {
-      m_moveGen.generateAllMoves<false>(m_pos, ml, false);
+      m_moveGen.generateAllMoves<false, false>(m_pos, ml);
       const uint32_t move = GUI::findMove(ml, arg);
       if (move != 0) {
         prevMoves.push(move);
@@ -205,7 +205,7 @@ template <bool whiteToMove>
 uint64_t Engine::perft(Position &pos, uint32_t depth) {
   MoveList move_list;
   const bool castle =
-      m_moveGen.generateAllMoves<whiteToMove>(pos, move_list, false);
+      m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
   m_nodes = 0;
 
 #ifndef SHALLOW_SEARCH
@@ -264,7 +264,7 @@ uint64_t Engine::search(Position &pos, int depth) {
 #ifdef SHALLOW_SEARCH
   MoveList move_list;
   const bool castleAllowed =
-      m_moveGen.generateAllMoves<whiteToMove>(pos, move_list, false);
+      m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
   if (depth > 1) {
     uint64_t numPositions = 0;
     if constexpr (castle) {
@@ -292,7 +292,7 @@ uint64_t Engine::search(Position &pos, int depth) {
 
   MoveList move_list;
   const bool castleAllowed =
-      m_moveGen.generateAllMoves<whiteToMove>(pos, move_list, false);
+      m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
   uint64_t numPositions = 0;
   for (int i = 0; i < move_list.size(); ++i) {
     doMove<whiteToMove, true>(pos, move_list.moves[i]);
@@ -312,7 +312,7 @@ template <bool whiteToMove> Move Engine::analysis(Position &pos, int depth) {
 
   MoveList move_list;
   const bool castle =
-      m_moveGen.generateAllMoves<whiteToMove>(pos, move_list, false);
+      m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
   MoveOrder::moveSort(move_list, pos, depth);
   m_nodes = 0;
   m_captureOnlyNodes = 0;
@@ -364,7 +364,7 @@ int Engine::negaMax(Position &pos, int alpha, int beta, int depth) {
   MoveList move_list;
 
   const bool castleAllowed =
-      m_moveGen.generateAllMoves<whiteToMove>(pos, move_list, false);
+      m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
 
   if (move_list.size() == 0) {
     if (pos.st.checkers) {
@@ -415,7 +415,7 @@ int Engine::qSearch(Position &pos, int alpha, int beta) {
     alpha = stand_pat;
 
   MoveList moveList;
-  m_moveGen.generateAllMoves<whiteToMove>(pos, moveList, true);
+  m_moveGen.generateAllMoves<whiteToMove, true>(pos, moveList);
   if (moveList.size() == 0) {
     return stand_pat;
   }
@@ -435,7 +435,7 @@ int Engine::qSearch(Position &pos, int alpha, int beta) {
 template <bool whiteToMove, bool castle>
 void Engine::moveIntegrity(Position &pos) {
   MoveList m;
-  m_moveGen.generateAllMoves<whiteToMove>(pos, m, false);
+  m_moveGen.generateAllMoves<whiteToMove, false>(pos, m);
   for (int i = 0; i < m.size(); ++i) {
     const int materialValue = pos.st.materialValue;
     const int materialScore = pos.st.materialScore;
@@ -690,84 +690,6 @@ void Engine::undoMove(Position &pos, uint32_t move) {
   pos.whiteToMove = !whiteToMove;
   pos.ply--;
 }
-
-/*template<bool whiteToMove, bool castle>
-void Engine::undoMove(Position& pos, uint32_t move) {
-    pos.st = prevStates.top();
-    prevStates.pop();
-
-    //Get move info
-    const uint8_t from = getFrom(move);
-    const uint8_t to = getTo(move);
-    const uint8_t mover = getMover(move);
-    //Captured will be 0 if there is no capture so important to do capture
-before move const uint8_t captured = getCaptured(move); const uint32_t flags =
-getFlags(move);
-
-    const uint64_t fromBB = BB(from);
-    const uint64_t toBB = BB(to);
-    const uint64_t capMask = toBB * (((flags & CAPTURE) == CAPTURE) && flags !=
-EP_CAPTURE);
-
-    //Incrementally update position
-    if constexpr (whiteToMove) {
-        pos.teamBoards[2] ^= fromBB ^ toBB;
-        pos.teamBoards[1] ^= capMask;
-    }
-    else {
-        pos.teamBoards[1] ^= fromBB ^ toBB;
-        pos.teamBoards[2] ^= capMask;
-    }
-
-    pos.pieceBoards[captured] ^= capMask;
-
-    if (mover == King) {
-        pos.kings[whiteToMove] = from;
-
-
-        if constexpr (castle) {
-            if (flags == CASTLE_KING) {
-                doCastle<!whiteToMove, true>(pos);
-            }
-            else if (flags == CASTLE_QUEEN) {
-                doCastle<!whiteToMove, false>(pos);
-            }
-        }
-
-    }
-    else {
-        pos.pieceBoards[mover] ^= fromBB ^ toBB;
-
-        //EP: add the ep pawn if there was an ep capture
-        if constexpr (whiteToMove) {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to - 8);
-            pos.pieceBoards[0] ^= ep_cap;
-            pos.teamBoards[1] ^= ep_cap;
-        }
-        else {
-            const uint64_t ep_cap = (flags == EP_CAPTURE) * BB(to + 8);
-            pos.pieceBoards[5] ^= ep_cap;
-            pos.teamBoards[2] ^= ep_cap;
-        }
-
-        //Pawn promotion
-        if ((flags & PROMO_N) != 0) {
-            if constexpr (whiteToMove) {
-                pos.pieceBoards[5] ^= toBB;
-                pos.pieceBoards[6 + getPromo(move)] ^= toBB;
-            }
-            else {
-                pos.pieceBoards[0] ^= toBB;
-                pos.pieceBoards[1 + getPromo(move)] ^= toBB;
-            }
-        }
-
-    }
-
-    pos.teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
-
-    pos.whiteToMove = !whiteToMove;
-}*/
 
 template <bool whiteToMove, bool castleKing>
 inline void Engine::doCastle(Position &pos) {

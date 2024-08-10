@@ -14,29 +14,23 @@ class MoveGen : magicalBits::MagicalBitboards {
 #endif
 public:
   MoveGen();
-  template <bool whiteToMove>
-  bool generateAllMoves(const Position &pos, MoveList &move_list,
-                        const bool onlyCapture) const;
+  template <bool whiteToMove, bool onlyCapture>
+  bool generateAllMoves(const Position &pos, MoveList &move_list) const;
 
-  template <bool whiteToMove, bool castling, bool pins, bool enPassant>
-  void generateMoves(const Position &pos, MoveList &move_list,
-                     const bool onlyCapture) const;
+  template <bool whiteToMove, bool castling, bool pins, bool onlyCapture>
+  void generateMoves(const Position &pos, MoveList &move_list) const;
 
-  template <bool whiteToMove, bool castling>
-  void generateKingMoves(const Position &pos, MoveList &move_list,
-                         const bool onlyCapture) const;
+  template <bool whiteToMove, bool castling, bool onlyCapture>
+  void generateKingMoves(const Position &pos, MoveList &move_list) const;
 
-  template <bool whiteToMove, bool pins, bool enPassent>
-  void generatePawnMoves(const Position &pos, MoveList &move_list,
-                         const bool onlyCapture) const;
+  template <bool whiteToMove, bool pins, bool onlyCapture>
+  void generatePawnMoves(const Position &pos, MoveList &move_list) const;
 
-  template <bool whiteToMove, bool pins>
-  void generateKnightMoves(const Position &pos, MoveList &move_list,
-                           const bool onlyCapture) const;
+  template <bool whiteToMove, bool pins, bool onlyCapture>
+  void generateKnightMoves(const Position &pos, MoveList &move_list) const;
 
-  template <bool whiteToMove, Piece p, bool pins>
-  void generatePieceMoves(const Position &pos, MoveList &move_list,
-                          const bool onlyCapture) const;
+  template <bool whiteToMove, Piece p, bool pins, bool onlyCapture>
+  void generatePieceMoves(const Position &pos, MoveList &move_list) const;
 
   // Move to private when working
   template <Piece p> inline uint64_t stepAttackBB(uint8_t square) const {
