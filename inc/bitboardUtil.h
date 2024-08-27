@@ -119,7 +119,7 @@ struct Position {
 };
 
 struct MoveList {
-    uint32_t       moves[100] = {};
+    move_t         moves[100] = {};
     uint8_t        curr       = 0;
     inline void    add(uint32_t move) { moves[curr++] = move; }
     inline uint8_t size() const { return curr; }

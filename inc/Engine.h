@@ -10,9 +10,11 @@
 
 class Engine {
   public:
-    explicit Engine();
-    Engine(const Engine &) = delete;
-    Engine(Engine &&)      = delete;
+    Engine();
+    Engine(const Engine &)                       = delete;
+    Engine(Engine &&)                            = delete;
+    Engine const &operator=(const Engine &other) = delete;
+    Engine       &operator=(Engine &&other)      = delete;
     ~Engine();
 
     void run();
