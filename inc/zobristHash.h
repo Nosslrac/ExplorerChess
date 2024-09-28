@@ -6,14 +6,14 @@ class ZobristHash {
   public:
     ZobristHash() { initHash(); }
     ~ZobristHash() = default;
-    uint64_t hashPosition(const Position &pos);
+    bitboard_t hashPosition(const Position &pos);
 
-    uint64_t pieceHash[10][64];
-    uint64_t kingHash[2][64];
-    uint64_t epHash[8];
-    uint64_t castleHash[16];
-    uint64_t whiteToMoveHash;
-    uint64_t moveHash;
+    bitboard_t pieceHash[10][64];
+    bitboard_t kingHash[2][64];
+    bitboard_t epHash[8];
+    bitboard_t castleHash[16];
+    bitboard_t whiteToMoveHash;
+    bitboard_t moveHash;
 
   private:
     void initHash();

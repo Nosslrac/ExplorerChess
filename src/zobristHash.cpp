@@ -2,10 +2,10 @@
 #include "random"
 
 void ZobristHash::initHash() {
-    std::random_device                      os_seed;
-    const uint32_t                          seed = os_seed();
-    std::mt19937                            generator(seed);
-    std::uniform_int_distribution<uint64_t> distribute(0, UINT64_MAX);
+    std::random_device                        os_seed;
+    const uint32_t                            seed = os_seed();
+    std::mt19937                              generator(seed);
+    std::uniform_int_distribution<bitboard_t> distribute(0, UINT64_MAX);
 
     // Init piece hash
     for (int i = 0; i < 10; i++) {
@@ -32,15 +32,15 @@ void ZobristHash::initHash() {
     moveHash        = distribute(generator);
 }
 
-uint64_t ZobristHash::hashPosition(const Position &pos) {
-    uint64_t posHash = 0ULL;
+bitboard_t ZobristHash::hashPosition(const Position &pos) {
+    bitboard_t posHash = 0ULL;
 
     if (pos.whiteToMove) {
         posHash ^= whiteToMoveHash;
     }
 
     for (int i = 0; i < 10; ++i) {
-        uint64_t pieces = pos.pieceBoards[i];
+        bitboard_t pieces = pos.pieceBoards[i];
         while (pieces) {
             int nextSquare = bitScan(pieces);
             posHash ^= pieceHash[i][nextSquare];

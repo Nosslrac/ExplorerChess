@@ -15,7 +15,7 @@ int Evaluation::evaluate(const Position &pos) const {
 /**
  * NOTE: only call on initialization
  */
-int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const {
+int Evaluation::staticPieceEvaluation(const bitboard_t pieces[10]) const {
     int materialBalance = 0;
     for (int i = 0; i < 5; ++i) {
         materialBalance +=
@@ -26,11 +26,11 @@ int Evaluation::staticPieceEvaluation(const uint64_t pieces[10]) const {
 
 template <bool whiteToMove>
 int Evaluation::undefendedPieces(const Position &pos) const {
-    const uint64_t defended = m_moveGen.findAttack<!whiteToMove>(
+    const bitboard_t defended = m_moveGen.findAttack<!whiteToMove>(
         pos); // Find what the moving side is defending
-    constexpr int8_t team   = whiteToMove ? 0 : 5;
-    uint64_t minorNodefense = ~defended & (pos.pieceBoards[Knight + team] |
-                                           pos.pieceBoards[Bishop + team]);
+    constexpr int8_t team     = whiteToMove ? 0 : 5;
+    bitboard_t minorNodefense = ~defended & (pos.pieceBoards[Knight + team] |
+                                             pos.pieceBoards[Bishop + team]);
     return -5 * bitCount(minorNodefense);
 }
 
@@ -64,10 +64,10 @@ int Evaluation::kingSafety(const Position &pos) const {
     constexpr uint8_t kingID = whiteToMove ? 0 : 1;
     int               score  = 0;
     const int         king   = pos.kings[kingID];
-    // const uint64_t bishopKnight = pos.pieceBoards[1 + 5 * kingID] |
+    // const bitboard_t bishopKnight = pos.pieceBoards[1 + 5 * kingID] |
     // pos.pieceBoards[2 + 5 * kingID]; //Good pieces for blocking
-    const uint64_t kingSquares = m_moveGen.stepAttackBB<King>(king);
-    // const uint64_t kingShield = forwardSquares<whiteToMove>(king) &
+    const bitboard_t kingSquares = m_moveGen.stepAttackBB<King>(king);
+    // const bitboard_t kingShield = forwardSquares<whiteToMove>(king) &
     // kingSquares; //Squares right infront of king
 
     score -= bitCount(pos.st.enemyAttack & kingSquares) *
@@ -82,22 +82,22 @@ int Evaluation::kingSafety(const Position &pos) const {
 }
 
 template <bool whiteToMove>
-int Evaluation::passedPawns(const uint64_t piece[10]) const {
+int Evaluation::passedPawns(const bitboard_t piece[10]) const {
     // Detect the files in front and the adjacent
     constexpr uint8_t team       = whiteToMove ? 0 : 5;
     constexpr uint8_t enemy      = whiteToMove ? 5 : 0;
-    uint64_t          pawns      = piece[team];
-    const uint64_t    enemyPawns = piece[enemy];
+    bitboard_t        pawns      = piece[team];
+    const bitboard_t  enemyPawns = piece[enemy];
     int               score      = 0;
     unsigned long     sq;
     while (pawns) {
         sq = bitScan(pawns);
-        const uint64_t forwardSQ =
+        const bitboard_t forwardSQ =
             adjacentFiles[sq & 7] & forwardSquares<whiteToMove>(sq);
         if (forwardSQ & enemyPawns) { // Passer
             score += 10;
-            const uint64_t defenders = shift<!whiteToMove, UP_LEFT>(BB(sq)) |
-                                       shift<!whiteToMove, UP_RIGHT>(BB(sq));
+            const bitboard_t defenders = shift<!whiteToMove, UP_LEFT>(BB(sq)) |
+                                         shift<!whiteToMove, UP_RIGHT>(BB(sq));
             if (defenders & piece[team]) { // Protected passer
                 score += 20;
             }

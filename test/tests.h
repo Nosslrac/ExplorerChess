@@ -8,7 +8,7 @@
 namespace ExplorerChessTest {
 using enginePtr = std::unique_ptr<Engine>;
 
-bool testPos(const enginePtr &engine, std::string &&fen, uint64_t count,
+bool testPos(const enginePtr &engine, std::string &&fen, bitboard_t count,
              int depth);
 
 

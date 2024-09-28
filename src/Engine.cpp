@@ -105,7 +105,7 @@ void Engine::runUI() {
       if (m_pos.whiteToMove) {
         prevMoves.push(ml.moves[i]);
         doMove<true, true>(m_pos, ml.moves[i]);
-        const uint64_t hash = m_zobristHash.hashPosition(m_pos);
+        const bitboard_t hash = m_zobristHash.hashPosition(m_pos);
         if (m_pos.st.hashKey != hash) {
           std::cout << "Hash fail on move: ";
           GUI::parseMove(ml.moves[i]);
@@ -114,7 +114,7 @@ void Engine::runUI() {
       } else {
         prevMoves.push(ml.moves[i]);
         doMove<false, true>(m_pos, ml.moves[i]);
-        const uint64_t hash = m_zobristHash.hashPosition(m_pos);
+        const bitboard_t hash = m_zobristHash.hashPosition(m_pos);
         if (m_pos.st.hashKey != hash) {
           std::cout << "Hash fail on move: ";
           GUI::parseMove(ml.moves[i]);
@@ -127,11 +127,11 @@ void Engine::runUI() {
   } else if (strcmp(command.c_str(), "g") == 0) {
     moveIntegrity<true, true>(m_pos);
   } else if (strcmp(command.c_str(), "bishop") == 0) {
-    uint64_t bs = m_pos.pieceBoards[2];
+    bitboard_t bs = m_pos.pieceBoards[2];
     while (bs) {
       int x = bitScan(bs);
       bs &= bs - 1;
-      uint64_t attack = m_moveGen.attackBB<Bishop>(m_pos.teamBoards[0], x);
+      bitboard_t attack = m_moveGen.attackBB<Bishop>(m_pos.teamBoards[0], x);
       GUI::print_bit_board(attack);
       GUI::print_pieces(m_pos);
     }
@@ -202,7 +202,7 @@ void Engine::runUI() {
 //---------------------------------------------------------------------
 
 template <bool whiteToMove>
-uint64_t Engine::perft(Position &pos, uint32_t depth) {
+bitboard_t Engine::perft(Position &pos, uint32_t depth) {
   MoveList move_list;
   const bool castle =
       m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
@@ -218,13 +218,13 @@ uint64_t Engine::perft(Position &pos, uint32_t depth) {
     return move_list.size();
   }
 #endif
-  uint64_t numPositions = 0;
+  bitboard_t numPositions = 0;
 
   if (castle) {
     for (int i = 0; i < move_list.size(); ++i) {
 
       doMove<whiteToMove, true>(pos, move_list.moves[i]);
-      const uint64_t part = search<!whiteToMove, true>(pos, depth - 1);
+      const bitboard_t part = search<!whiteToMove, true>(pos, depth - 1);
       numPositions += part;
 #ifdef PRINT_OUT
       GUI::printMove(move_list.moves[i]);
@@ -236,7 +236,7 @@ uint64_t Engine::perft(Position &pos, uint32_t depth) {
     for (int i = 0; i < move_list.size(); ++i) {
 
       doMove<whiteToMove, false>(pos, move_list.moves[i]);
-      const uint64_t part = search<!whiteToMove, false>(pos, depth - 1);
+      const bitboard_t part = search<!whiteToMove, false>(pos, depth - 1);
       numPositions += part;
 #ifdef PRINT_OUT
       GUI::printMove(move_list.moves[i]);
@@ -255,7 +255,7 @@ uint64_t Engine::perft(Position &pos, uint32_t depth) {
 }
 
 template <bool whiteToMove, bool castle>
-uint64_t Engine::search(Position &pos, int depth) {
+bitboard_t Engine::search(Position &pos, int depth) {
   m_nodes++;
   // if (_transpositionTable.contains(pos.st.hashKey)) {
   //   return _transpositionTable.at(pos.st.hashKey);
@@ -266,7 +266,7 @@ uint64_t Engine::search(Position &pos, int depth) {
   const bool castleAllowed =
       m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
   if (depth > 1) {
-    uint64_t numPositions = 0;
+    bitboard_t numPositions = 0;
     if constexpr (castle) {
       if (castleAllowed) {
         for (int i = 0; i < move_list.size(); ++i) {
@@ -293,7 +293,7 @@ uint64_t Engine::search(Position &pos, int depth) {
   MoveList move_list;
   const bool castleAllowed =
       m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
-  uint64_t numPositions = 0;
+  bitboard_t numPositions = 0;
   for (int i = 0; i < move_list.size(); ++i) {
     doMove<whiteToMove, true>(pos, move_list.moves[i]);
     numPositions += search<!whiteToMove, true>(pos, depth - 1);
@@ -464,7 +464,7 @@ template <bool whiteToMove, bool castle>
 void Engine::doMove(Position &pos, uint32_t move) {
   // Save state info
   prevStates.push(pos.st);
-  uint64_t newHash = pos.st.hashKey ^ m_zobristHash.whiteToMoveHash;
+  bitboard_t newHash = pos.st.hashKey ^ m_zobristHash.whiteToMoveHash;
 
   // Get move info
   const uint8_t from = getFrom(move);
@@ -474,8 +474,8 @@ void Engine::doMove(Position &pos, uint32_t move) {
   // move
   const uint8_t captured = getCaptured(move);
   const uint32_t flags = getFlags(move);
-  const uint64_t fromBB = BB(from);
-  const uint64_t toBB = BB(to);
+  const bitboard_t fromBB = BB(from);
+  const bitboard_t toBB = BB(to);
 
   constexpr uint8_t team = whiteToMove ? 1 : 2;
   constexpr uint8_t enemy = whiteToMove ? 2 : 1;
@@ -629,11 +629,11 @@ void Engine::undoMove(Position &pos, uint32_t move) {
   const uint8_t captured = getCaptured(move);
   const uint32_t flags = getFlags(move);
 
-  const uint64_t fromBB = BB(from);
-  const uint64_t toBB = BB(to);
+  const bitboard_t fromBB = BB(from);
+  const bitboard_t toBB = BB(to);
   const bool isCapture =
       (((flags & CAPTURE) == CAPTURE) && flags != EP_CAPTURE);
-  const uint64_t capMask = toBB * isCapture;
+  const bitboard_t capMask = toBB * isCapture;
 
   // Incrementally update position
   if constexpr (whiteToMove) {
@@ -662,11 +662,11 @@ void Engine::undoMove(Position &pos, uint32_t move) {
 
     // EP: add the ep pawn if there was an ep capture
     if constexpr (whiteToMove) {
-      const uint64_t ep_cap = (flags == EP_CAPTURE) * BB((to - 8));
+      const bitboard_t ep_cap = (flags == EP_CAPTURE) * BB((to - 8));
       pos.pieceBoards[0] ^= ep_cap;
       pos.teamBoards[1] ^= ep_cap;
     } else {
-      const uint64_t ep_cap = (flags == EP_CAPTURE) * BB((to + 8));
+      const bitboard_t ep_cap = (flags == EP_CAPTURE) * BB((to + 8));
       pos.pieceBoards[5] ^= ep_cap;
       pos.teamBoards[2] ^= ep_cap;
     }
@@ -694,12 +694,12 @@ void Engine::undoMove(Position &pos, uint32_t move) {
 template <bool whiteToMove, bool castleKing>
 inline void Engine::doCastle(Position &pos) {
   if constexpr (whiteToMove) {
-    constexpr uint64_t rookFromTo =
+    constexpr bitboard_t rookFromTo =
         castleKing ? BB(63) | BB(61) : BB(56) | BB(59);
     pos.pieceBoards[3] ^= rookFromTo;
     pos.teamBoards[1] ^= rookFromTo;
   } else {
-    constexpr uint64_t rookFromTo = castleKing ? BB(7) | BB(5) : BB(0) | BB(3);
+    constexpr bitboard_t rookFromTo = castleKing ? BB(7) | BB(5) : BB(0) | BB(3);
     pos.pieceBoards[8] ^= rookFromTo;
     pos.teamBoards[2] ^= rookFromTo;
   }

@@ -11,15 +11,15 @@
 class Engine {
   public:
     Engine();
-    Engine(const Engine &)                       = delete;
-    Engine(Engine &&)                            = delete;
+    Engine(const Engine &) = delete;
+    Engine(Engine &&)      = delete;
     Engine const &operator=(const Engine &other) = delete;
-    Engine       &operator=(Engine &&other)      = delete;
+    Engine &      operator=(Engine &&other) = delete;
     ~Engine();
 
     void run();
 
-    template <bool whiteToMove> uint64_t perft(Position &pos, uint32_t depth);
+    template <bool whiteToMove> bitboard_t perft(Position &pos, uint32_t depth);
     // Init position
     void fenInit(Position &, std::string);
 
@@ -40,7 +40,7 @@ class Engine {
 
     // Perft
     template <bool whiteToMove, bool castle>
-    uint64_t search(Position &pos, int depth);
+    bitboard_t search(Position &pos, int depth);
 
     // Evaluation search
     template <bool whiteToMove> Move analysis(Position &pos, int depth);
@@ -58,18 +58,18 @@ class Engine {
     MoveGen     m_moveGen;
     Evaluation  m_evaluation;
     ZobristHash m_zobristHash;
-    uint64_t    m_nodes;
-    uint64_t    m_captureOnlyNodes;
+    bitboard_t  m_nodes;
+    bitboard_t  m_captureOnlyNodes;
 
     // History stack
     std::stack<StateInfo> prevStates;
     std::stack<uint32_t>  prevMoves;
 
     // Perft transposition
-    // std::unordered_map<uint64_t, uint64_t> _transpositionTable;
+    // std::unordered_map<bitboard_t, bitboard_t> _transpositionTable;
 
-    robin_hood::unordered_flat_map<uint64_t, uint64_t> _transpositionTable;
+    robin_hood::unordered_flat_map<bitboard_t, bitboard_t> _transpositionTable;
 
     // Evaluation transposition
-    robin_hood::unordered_flat_map<uint64_t, int> _evalTransposition;
+    robin_hood::unordered_flat_map<bitboard_t, int> _evalTransposition;
 };

@@ -16,15 +16,15 @@ PextAttack::PextAttack() {
 
 void PextAttack::initRook() {
     for (int square = 0; square < 64; ++square) {
-        uint64_t relBits = relevantBits<Rook>(square);
-        rookBits[square] = relBits;
-        const int bits   = bitCount(relBits);
+        bitboard_t relBits = relevantBits<Rook>(square);
+        rookBits[square]   = relBits;
+        const int bits     = bitCount(relBits);
         assert(bits < 13);
         int combinations = static_cast<int>(std::pow<int, int>(2, bits));
         for (int i = 0; i < combinations; ++i) {
-            uint64_t       occupancy = setOccupancy(relBits, i);
-            const uint64_t attack    = rookAttackSlow(occupancy, square);
-            rookAttackPtr[square][i] = attack;
+            bitboard_t       occupancy = setOccupancy(relBits, i);
+            const bitboard_t attack    = rookAttackSlow(occupancy, square);
+            rookAttackPtr[square][i]   = attack;
             assert(pext(occupancy, relBits) == i);
         }
     }
@@ -32,21 +32,21 @@ void PextAttack::initRook() {
 
 void PextAttack::initBishop() {
     for (int square = 0; square < 64; ++square) {
-        uint64_t relBits   = relevantBits<Bishop>(square);
+        bitboard_t relBits = relevantBits<Bishop>(square);
         bishopBits[square] = relBits;
         const int bits     = bitCount(relBits);
         assert(bits < 10); // Max should be 9 bits
         int combinations = static_cast<int>(std::pow<int, int>(2, bits));
         for (int i = 0; i < combinations; ++i) {
-            uint64_t       occupancy   = setOccupancy(relBits, i);
-            const uint64_t attack      = bishopAttackSlow(occupancy, square);
+            bitboard_t       occupancy = setOccupancy(relBits, i);
+            const bitboard_t attack    = bishopAttackSlow(occupancy, square);
             bishopAttackPtr[square][i] = attack;
             assert(pext(occupancy, relBits) == i);
         }
     }
 }
 
-template <Piece p> uint64_t relevantBits(int square) {
+template <Piece p> bitboard_t relevantBits(int square) {
     assert(p == Bishop || p == Rook);
 
     std::array<int, 4> dirs;
@@ -56,7 +56,7 @@ template <Piece p> uint64_t relevantBits(int square) {
         dirs = {-1, 1, -8, 8};
     }
 
-    uint64_t board = 0ULL;
+    bitboard_t board = 0ULL;
 
     for (int i = 0; i < 4; ++i) {
         int tempSquare = square;
@@ -71,9 +71,9 @@ template <Piece p> uint64_t relevantBits(int square) {
 }
 
 // Return the rooks attacks for the current occupancy and square
-uint64_t rookAttackSlow(uint64_t board, int square) {
-    const int dirs[4] = {-1, 1, -8, 8};
-    uint64_t  attack  = 0ULL;
+bitboard_t rookAttackSlow(bitboard_t board, int square) {
+    const int  dirs[4] = {-1, 1, -8, 8};
+    bitboard_t attack  = 0ULL;
 
     for (int i = 0; i < 4; ++i) {
         int tempSquare = square;
@@ -88,9 +88,9 @@ uint64_t rookAttackSlow(uint64_t board, int square) {
     return attack;
 }
 
-uint64_t bishopAttackSlow(uint64_t board, int square) {
-    const int dirs[4] = {-7, -9, 7, 9};
-    uint64_t  attack  = 0ULL;
+bitboard_t bishopAttackSlow(bitboard_t board, int square) {
+    const int  dirs[4] = {-7, -9, 7, 9};
+    bitboard_t attack  = 0ULL;
 
     for (int i = 0; i < 4; ++i) {
         int tempSquare = square;
@@ -105,8 +105,8 @@ uint64_t bishopAttackSlow(uint64_t board, int square) {
     return attack;
 }
 
-uint64_t setOccupancy(uint64_t relevantBits, int pextIndex) {
-    uint64_t occupancy = 0ULL;
+bitboard_t setOccupancy(bitboard_t relevantBits, int pextIndex) {
+    bitboard_t occupancy = 0ULL;
     while (pextIndex) {
         int sq = bitScan(relevantBits);
         relevantBits &= relevantBits - 1;

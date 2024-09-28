@@ -7,7 +7,7 @@
 namespace ExplorerChessTest {
 
 
-bool testPos(const enginePtr &engine, std::string &&fen, const uint64_t count,
+bool testPos(const enginePtr &engine, std::string &&fen, const bitboard_t count,
              const int depth) {
     Position pos;
     engine->fenInit(pos, fen);

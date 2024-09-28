@@ -3,41 +3,44 @@
 #include <functional>
 #include <stdint.h>
 
+#include "types.h"
+
 namespace magicalBits {
 
 class MagicalBitboards {
   public:
     MagicalBitboards();
 
-    uint64_t getMask(uint8_t square);
+    bitboard_t getMask(uint8_t square);
 
 
-    static uint64_t findMagicNumber(
-        uint32_t position, uint8_t bitCount,
-        std::function<uint64_t(uint8_t)>           attackFunction,
-        std::function<uint64_t(uint8_t, uint64_t)> attacksWithBlockFunction);
+    static bitboard_t
+         findMagicNumber(uint32_t position, uint8_t bitCount,
+                         std::function<bitboard_t(uint8_t)> attackFunction,
+                         std::function<bitboard_t(uint8_t, bitboard_t)>
+                             attacksWithBlockFunction);
     void initMagicNumbers();
 
   private:
-    static uint64_t maskBishopAttacks(uint8_t position);
-    static uint64_t maskRookAttacks(uint8_t position);
-    static uint64_t maskBishopAttacksWithBlock(uint8_t  position,
-                                               uint64_t boardMask);
-    static uint64_t maskRookAttacksWithBlock(uint8_t  position,
-                                             uint64_t boardMask);
-    static uint8_t  countBits(uint64_t board);
-    static uint64_t setOccupancy(uint32_t position, uint8_t bitCount,
-                                 uint64_t attackMask);
+    static bitboard_t maskBishopAttacks(uint8_t position);
+    static bitboard_t maskRookAttacks(uint8_t position);
+    static bitboard_t maskBishopAttacksWithBlock(uint8_t    position,
+                                                 bitboard_t boardMask);
+    static bitboard_t maskRookAttacksWithBlock(uint8_t    position,
+                                               bitboard_t boardMask);
+    static uint8_t    countBits(bitboard_t board);
+    static bitboard_t setOccupancy(uint32_t position, uint8_t bitCount,
+                                   bitboard_t attackMask);
 
 
   protected:
     void initSliderAttacks();
 
-    uint64_t m_bishopMasks[64];
-    uint64_t m_rookMasks[64];
+    bitboard_t m_bishopMasks[64];
+    bitboard_t m_rookMasks[64];
 
-    uint64_t m_bishopAttacks[64][512];
-    uint64_t m_rookAttacks[64][4096];
+    bitboard_t m_bishopAttacks[64][512];
+    bitboard_t m_rookAttacks[64][4096];
 
   protected:
     static constexpr uint8_t m_occupacyCountBishop[64] = {
@@ -50,7 +53,7 @@ class MagicalBitboards {
         11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
         11, 10, 10, 10, 10, 10, 10, 11, 12, 11, 11, 11, 11, 11, 11, 12};
 
-    static constexpr uint64_t m_bishopMagicBitboard[64] = {
+    static constexpr bitboard_t m_bishopMagicBitboard[64] = {
         0x1104043802430608ULL, 0x48600381421c3088ULL, 0x1004011206050048ULL,
         0x2008048118581261ULL, 0xac5040030810a4ULL,   0x22010521200200ULL,
         0x401e061220450926ULL, 0x10e020710821030ULL,  0x486301010093060ULL,
@@ -74,7 +77,7 @@ class MagicalBitboards {
         0x6c8b2a4042104109ULL, 0x41a2401950304188ULL, 0x3b06700c5848304aULL,
         0x2160381011132121ULL};
 
-    static constexpr uint64_t m_rookMagicBitboard[64] = {
+    static constexpr bitboard_t m_rookMagicBitboard[64] = {
         0x280018940015060ULL,  0x4c0006008405005ULL,  0xe000a8022001040ULL,
         0xd00100048646100ULL,  0x680180044004680ULL,  0x5a00012804160050ULL,
         0x880208021000200ULL,  0x4600020b02224184ULL, 0x10860022058300c0ULL,
@@ -99,5 +102,5 @@ class MagicalBitboards {
         0x104202104840646ULL};
 };
 
-uint64_t randomNumber();
+bitboard_t randomNumber();
 } // namespace magicalBits

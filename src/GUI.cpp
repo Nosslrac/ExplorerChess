@@ -1,6 +1,6 @@
 #include "GUI.h"
 namespace GUI {
-void print_bit_board(uint64_t b) {
+void print_bit_board(bitboard_t b) {
 
     std::string stb = "";
     stb += "--------------------\n";
@@ -49,7 +49,7 @@ void print_pieces(const Position &pos) {
 void fillPieceArray(const Position &pos, char pBoard[]) {
     std::fill_n(pBoard, 64, ' ');
     for (int i = 0; i < 10; i++) {
-        uint64_t      pieces = pos.pieceBoards[i];
+        bitboard_t    pieces = pos.pieceBoards[i];
         unsigned long sq;
         while (pieces) {
             sq         = bitScan(pieces);
@@ -185,7 +185,7 @@ void printState(StateInfo &st) {
     std::cout << buff << std::endl;
 }
 
-void getCheckers(std::string &checkerSQ, uint64_t checkerBB) {
+void getCheckers(std::string &checkerSQ, bitboard_t checkerBB) {
     unsigned long sq;
     while (checkerBB) {
         sq = bitScan(checkerBB);

@@ -10,12 +10,12 @@
 namespace magicalBits {
 MagicalBitboards::MagicalBitboards() { initSliderAttacks(); }
 
-uint64_t MagicalBitboards::getMask(uint8_t square) {
+bitboard_t MagicalBitboards::getMask(uint8_t square) {
     return m_bishopMasks[square];
 }
 
-uint64_t MagicalBitboards::maskBishopAttacks(uint8_t position) {
-    uint64_t attacks = 0ULL;
+bitboard_t MagicalBitboards::maskBishopAttacks(uint8_t position) {
+    bitboard_t attacks = 0ULL;
 
     char r, f;
 
@@ -34,8 +34,8 @@ uint64_t MagicalBitboards::maskBishopAttacks(uint8_t position) {
     return attacks;
 }
 
-uint64_t MagicalBitboards::maskRookAttacks(uint8_t position) {
-    uint64_t attacks = 0ULL;
+bitboard_t MagicalBitboards::maskRookAttacks(uint8_t position) {
+    bitboard_t attacks = 0ULL;
 
     char r, f;
 
@@ -54,10 +54,10 @@ uint64_t MagicalBitboards::maskRookAttacks(uint8_t position) {
     return attacks;
 }
 
-uint64_t MagicalBitboards::maskBishopAttacksWithBlock(uint8_t  position,
-                                                      uint64_t boardMask) {
-    uint64_t attacks = 0ULL;
-    uint64_t attack  = 0ULL;
+bitboard_t MagicalBitboards::maskBishopAttacksWithBlock(uint8_t    position,
+                                                        bitboard_t boardMask) {
+    bitboard_t attacks = 0ULL;
+    bitboard_t attack  = 0ULL;
 
     char r, f;
 
@@ -93,11 +93,11 @@ uint64_t MagicalBitboards::maskBishopAttacksWithBlock(uint8_t  position,
     return attacks;
 }
 
-uint64_t MagicalBitboards::maskRookAttacksWithBlock(uint8_t  position,
-                                                    uint64_t boardMask) {
-    uint64_t attacks = 0ULL;
-    uint64_t attack  = 0ULL;
-    char     r, f;
+bitboard_t MagicalBitboards::maskRookAttacksWithBlock(uint8_t    position,
+                                                      bitboard_t boardMask) {
+    bitboard_t attacks = 0ULL;
+    bitboard_t attack  = 0ULL;
+    char       r, f;
 
     const uint8_t tr = position >> 3;
     const uint8_t tf = position & 7;
@@ -131,7 +131,7 @@ uint64_t MagicalBitboards::maskRookAttacksWithBlock(uint8_t  position,
 
     return attacks;
 }
-uint8_t MagicalBitboards::countBits(uint64_t board) {
+uint8_t MagicalBitboards::countBits(bitboard_t board) {
     uint8_t count = 0;
 
     while (board) {
@@ -141,9 +141,9 @@ uint8_t MagicalBitboards::countBits(uint64_t board) {
     return count;
 }
 
-uint64_t MagicalBitboards::setOccupancy(uint32_t position, uint8_t bitCount,
-                                        uint64_t attackMask) {
-    uint64_t occupancy = 0ULL;
+bitboard_t MagicalBitboards::setOccupancy(uint32_t position, uint8_t bitCount,
+                                          bitboard_t attackMask) {
+    bitboard_t occupancy = 0ULL;
 
     unsigned long square;
     for (uint32_t count = 0; count < bitCount; count++) {
@@ -158,17 +158,17 @@ uint64_t MagicalBitboards::setOccupancy(uint32_t position, uint8_t bitCount,
 }
 
 // This is only used for generating magical numbers once :)
-uint64_t MagicalBitboards::findMagicNumber(
+bitboard_t MagicalBitboards::findMagicNumber(
     uint32_t position, uint8_t bitCount,
-    std::function<uint64_t(uint8_t)>           attackFunction,
-    std::function<uint64_t(uint8_t, uint64_t)> attacksWithBlockFunction) {
-    uint64_t occupancies[4096];
+    std::function<bitboard_t(uint8_t)>             attackFunction,
+    std::function<bitboard_t(uint8_t, bitboard_t)> attacksWithBlockFunction) {
+    bitboard_t occupancies[4096];
 
-    uint64_t attacks[4096];
+    bitboard_t attacks[4096];
 
-    uint64_t usedAttacks[4096];
+    bitboard_t usedAttacks[4096];
 
-    uint64_t attackMask = attackFunction(position);
+    bitboard_t attackMask = attackFunction(position);
 
     int occupancyIndicies = 1 << bitCount;
 
@@ -179,7 +179,7 @@ uint64_t MagicalBitboards::findMagicNumber(
     }
 
     for (int random_count = 0; random_count < 100000000; random_count++) {
-        uint64_t magicNumber = randomNumber();
+        bitboard_t magicNumber = randomNumber();
 
         if (countBits((attackMask * magicNumber) & 0xFF00000000000000) < 6)
             continue;
@@ -220,13 +220,14 @@ void MagicalBitboards::initSliderAttacks() {
     for (int square = 0; square < 64; square++) {
         m_bishopMasks[square] = maskBishopAttacks(square);
 
-        uint64_t attackMask        = m_bishopMasks[square];
-        int      relevantBitsCount = countBits(attackMask);
-        int      occupancyIndicies = 1 << relevantBitsCount;
+        bitboard_t attackMask        = m_bishopMasks[square];
+        int        relevantBitsCount = countBits(attackMask);
+        int        occupancyIndicies = 1 << relevantBitsCount;
 
         for (int i = 0; i < occupancyIndicies; i++) {
-            uint64_t occupancy = setOccupancy(i, relevantBitsCount, attackMask);
-            int      magicIndex = (occupancy * m_bishopMagicBitboard[square]) >>
+            bitboard_t occupancy =
+                setOccupancy(i, relevantBitsCount, attackMask);
+            int magicIndex = (occupancy * m_bishopMagicBitboard[square]) >>
                              (64 - m_occupacyCountBishop[square]);
             m_bishopAttacks[square][magicIndex] =
                 maskBishopAttacksWithBlock(square, occupancy);
@@ -239,8 +240,9 @@ void MagicalBitboards::initSliderAttacks() {
         occupancyIndicies = 1 << relevantBitsCount;
 
         for (int i = 0; i < occupancyIndicies; i++) {
-            uint64_t occupancy = setOccupancy(i, relevantBitsCount, attackMask);
-            int      magicIndex = (occupancy * m_rookMagicBitboard[square]) >>
+            bitboard_t occupancy =
+                setOccupancy(i, relevantBitsCount, attackMask);
+            int magicIndex = (occupancy * m_rookMagicBitboard[square]) >>
                              (64 - m_occupacyCountRook[square]);
             m_rookAttacks[square][magicIndex] =
                 maskRookAttacksWithBlock(square, occupancy);
@@ -248,19 +250,19 @@ void MagicalBitboards::initSliderAttacks() {
     }
 }
 
-uint64_t randomNumber() {
-    uint64_t random1 = static_cast<uint64_t>(std::rand()) |
-                       (static_cast<uint64_t>(std::rand()) << 16) |
-                       (static_cast<uint64_t>(std::rand()) << 32) |
-                       (static_cast<uint64_t>(std::rand()) << 48);
-    uint64_t random2 = static_cast<uint64_t>(std::rand()) |
-                       (static_cast<uint64_t>(std::rand()) << 16) |
-                       (static_cast<uint64_t>(std::rand()) << 32) |
-                       (static_cast<uint64_t>(std::rand()) << 48);
-    // uint64_t random3 = static_cast<uint64_t>(std::rand()) |
-    // (static_cast<uint64_t>(std::rand()) << 16) |
-    // (static_cast<uint64_t>(std::rand()) << 32) |
-    // (static_cast<uint64_t>(std::rand()) << 48);
+bitboard_t randomNumber() {
+    bitboard_t random1 = static_cast<bitboard_t>(std::rand()) |
+                         (static_cast<bitboard_t>(std::rand()) << 16) |
+                         (static_cast<bitboard_t>(std::rand()) << 32) |
+                         (static_cast<bitboard_t>(std::rand()) << 48);
+    bitboard_t random2 = static_cast<bitboard_t>(std::rand()) |
+                         (static_cast<bitboard_t>(std::rand()) << 16) |
+                         (static_cast<bitboard_t>(std::rand()) << 32) |
+                         (static_cast<bitboard_t>(std::rand()) << 48);
+    // bitboard_t random3 = static_cast<bitboard_t>(std::rand()) |
+    // (static_cast<bitboard_t>(std::rand()) << 16) |
+    // (static_cast<bitboard_t>(std::rand()) << 32) |
+    // (static_cast<bitboard_t>(std::rand()) << 48);
     return random1 & random2; // & random3;
 }
 

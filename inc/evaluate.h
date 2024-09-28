@@ -23,7 +23,7 @@ class Evaluation {
 
     // Material balance
     int initMaterialValue(const Position &pos) const;
-    int staticPieceEvaluation(const uint64_t piece[10]) const;
+    int staticPieceEvaluation(const bitboard_t piece[10]) const;
 
   private:
     uint16_t pieceValue[5] = {100, 300, 300, 500, 900};
@@ -33,7 +33,8 @@ class Evaluation {
     // Static pawn structure evaluation, to be stored in a lookup table
     //- Isolated pawns
     //- Passed pawns (+ if it is protected by another pawn)
-    template <bool whiteToMove> int passedPawns(const uint64_t piece[10]) const;
+    template <bool whiteToMove>
+    int passedPawns(const bitboard_t piece[10]) const;
 
     // Undefended pieces penalty
 
@@ -41,9 +42,9 @@ class Evaluation {
 
     // Attacking potential
     template <bool whiteToMove>
-    int attackPotential(const uint64_t piece[10]) const;
+    int attackPotential(const bitboard_t piece[10]) const;
 
-    robin_hood::unordered_map<uint64_t, int> pawnStructure;
+    robin_hood::unordered_map<bitboard_t, int> pawnStructure;
 
     // King safety (use some kind of pext for surrounding squares and then
     // switch case maybe) Also open lines based on oponents sliding pieces

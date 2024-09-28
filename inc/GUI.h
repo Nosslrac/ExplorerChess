@@ -16,7 +16,7 @@ constexpr char fenMove[2]            = {'w', 'b'};
 /** Prints bitboard b in the console with set bits as x
  * @param b
  */
-void print_bit_board(uint64_t b);
+void print_bit_board(bitboard_t b);
 /** Prints board with pieces as their fen representation
  * @param square position info
  */
@@ -37,7 +37,7 @@ void printMove(uint32_t move);
 
 void printState(StateInfo &st);
 
-void getCheckers(std::string &checkerSQ, uint64_t checkerBB);
+void getCheckers(std::string &checkerSQ, bitboard_t checkerBB);
 
 uint32_t findMove(MoveList &ml, std::string move) noexcept;
 } // namespace GUI
