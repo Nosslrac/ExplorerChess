@@ -1,4 +1,5 @@
 #include "GUI.h"
+
 namespace GUI {
 void print_bit_board(bitboard_t b) {
 

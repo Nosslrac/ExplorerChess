@@ -1,7 +1,8 @@
 #include "Engine.h"
+#include "EngineInterface.h"
 
 int main() {
-    Engine engine;
-    engine.run();
+    ExplorerChess::EngineParser parser;
+    parser.runInterface();
     return 0;
 }

@@ -21,6 +21,7 @@
 // clang-format 
 
 #include "Engine.h"
+#include "bitboardUtil.h"
 #include "moveOrdering.h"
 #include "GUI.h"
 
@@ -36,26 +37,12 @@ Engine::Engine()
 
 Engine::~Engine() = default;
 
-void Engine::run() {
-  std::cout << "ExplorerChess 1.0. Use help for a list of commands"
-            << std::endl;
-  while (true) {
-    runUI();
-  }
-}
 
 void Engine::runUI() {
-  std::string userInput;
-  std::getline(std::cin, userInput);
+  
 
-  size_t commandEnd1 = userInput.find(' ');
-  size_t commandEnd2 = userInput.find(' ', commandEnd1 + 1);
-  commandEnd2 = commandEnd2 > userInput.size() ? userInput.size() : commandEnd2;
-
-  std::string command = userInput.substr(0, commandEnd1);
-  std::string arg =
-      userInput.substr(commandEnd1 + 1, commandEnd2 - commandEnd1 - 1);
-
+  
+    /*
   if (strcmp(command.c_str(), "testpos") == 0) {
 #ifdef PEXT
     std::cout << "PEXT\n";
@@ -63,8 +50,10 @@ void Engine::runUI() {
     std::cout << "MAGIC\n";
 #endif
     fenInit(m_pos, "8/8/p1p5/1p5p/1P5p/8/PPP2K1p/4R1rk w - - 0 1");
-    // fenInit(m_pos, "r1b1kb1r/pppp1ppp/5q2/4n3/3KP3/2N3PN/PPP4P/R1BQ1B1R b kq
-    // - 0 1");
+  }
+  else if(strcmp(command.c_str(), "uci") == 0){
+    m_mode = EngineMode::UCI;
+    // Do UCI stuff
   }
 
   else if (strcmp(command.c_str(), "position") == 0) {
@@ -195,11 +184,53 @@ void Engine::runUI() {
 
     std::cout << "Command not found: Try help for a list of commands\n";
   }
+    */
 }
 
 //---------------------------------------------------------------------
 //---------------------- Perft ----------------------------------------
 //---------------------------------------------------------------------
+
+
+const Position& Engine::getPos() const{
+    return m_pos;
+}
+
+void Engine::makeMove(const std::string &moveArgument){
+    MoveList ml;
+    if(m_pos.whiteToMove){
+        m_moveGen.generateAllMoves<true, false>(m_pos, ml);
+        move_t move = GUI::findMove(ml, moveArgument);
+        if(move != 0){
+            prevMoves.push(move);
+            doMove<true, true>(m_pos, move);
+        }
+    }
+    else{
+        m_moveGen.generateAllMoves<false, false>(m_pos, ml);
+        move_t move = GUI::findMove(ml, moveArgument);
+        if(move != 0){
+            prevMoves.push(move);
+            doMove<false, true>(m_pos, move);
+        }
+    }
+    
+}
+
+
+
+bitboard_t Engine::goPerft(uint32_t depth){
+    if(m_pos.whiteToMove){
+        return perft<true>(m_pos, depth);
+    }
+    else{
+        return perft<false>(m_pos, depth);
+    }
+}
+
+void Engine::position(const std::string& fen){
+    fenInit(m_pos, fen);
+}
 
 template <bool whiteToMove>
 bitboard_t Engine::perft(Position &pos, uint32_t depth) {

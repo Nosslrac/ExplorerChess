@@ -17,8 +17,10 @@ class Engine {
     Engine &      operator=(Engine &&other) = delete;
     ~Engine();
 
-    void run();
-
+    const Position& getPos() const;
+    void makeMove(const std::string& moveArgument);
+    bitboard_t goPerft(uint32_t depth);
+    void position(const std::string& fen);
     template <bool whiteToMove> bitboard_t perft(Position &pos, uint32_t depth);
     // Init position
     void fenInit(Position &, std::string);
