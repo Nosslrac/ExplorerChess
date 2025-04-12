@@ -1,8 +1,8 @@
-#include "Engine.h"
 #include "EngineInterface.h"
 
-int main() {
-    ExplorerChess::EngineParser parser;
-    parser.runInterface();
-    return 0;
+int main()
+{
+  ExplorerChess::EngineParser parser;
+  parser.runInterface();
+  return 0;
 }

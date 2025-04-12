@@ -1,16 +1,17 @@
 #pragma once
-#include "bitboardUtil.h"
+#include <x86intrin.h>
+
 #include <cinttypes>
 #include <iostream>
-#include <x86intrin.h>
+
+#include "bitboardUtil.h"
 
 namespace GUI {
 // Fen representation
 constexpr char fenRepresentation[10] = {'P', 'N', 'B', 'R', 'Q',
                                         'p', 'n', 'b', 'r', 'q'};
-constexpr char fenCastle[4]          = {'K', 'Q', 'k', 'q'};
-constexpr char fenMove[2]            = {'w', 'b'};
-
+constexpr char fenCastle[4] = {'K', 'Q', 'k', 'q'};
+constexpr char fenMove[2] = {'w', 'b'};
 
 // Functions
 /** Prints bitboard b in the console with set bits as x
