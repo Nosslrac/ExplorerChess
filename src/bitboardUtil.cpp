@@ -19,21 +19,29 @@ void initLineBB(bitboard_t (&lineBB)[64][64])
 bitboard_t pinned_ray(int king, int piece)
 {
   // On the same rank
-  if (king / 8 == piece / 8)
-    return ranks[king / 8];
+  if (king / BOARD_DIMMENSION == piece / BOARD_DIMMENSION)
+  {
+    return ranks[king / BOARD_DIMMENSION];
+  }
   // On the same file
-  if (king % 8 == piece % 8)
-    return files[king % 8];
-  const int diagonal = king / 8 + king % 8;
+  if (king % BOARD_DIMMENSION == piece % BOARD_DIMMENSION)
+  {
+    return files[king % BOARD_DIMMENSION];
+  }
+
+  const int diagonal = king / BOARD_DIMMENSION + king % BOARD_DIMMENSION;
   // On the same anti-diagonal
-  if (diagonal == piece / 8 + piece % 8)
+  if (diagonal == piece / BOARD_DIMMENSION + piece % BOARD_DIMMENSION)
+  {
     return anti_diagonals[diagonal];
+  }
   // Otherwise on the same main-diagonal
-  if ((king % 8 - king / 8) == (piece % 8 - piece / 8))
-    return main_diagonals[7 - king / 8 + king % 8];
+  if ((king % BOARD_DIMMENSION - king / BOARD_DIMMENSION) ==
+      (piece % BOARD_DIMMENSION - piece / BOARD_DIMMENSION))
+  {
+
+    return main_diagonals[7 - king / BOARD_DIMMENSION +
+                          king % BOARD_DIMMENSION];
+  }
   return 0;
 }
-
-template uint8_t getPiece<false>(const bitboard_t[], uint8_t);
-
-template uint8_t getPiece<true>(const bitboard_t[], uint8_t);

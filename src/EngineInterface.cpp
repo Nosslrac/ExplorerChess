@@ -1,10 +1,9 @@
 #include "EngineInterface.h"
 
-#include <string.h>
-
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <string>
 
 #include "Engine.h"
 #include "GUI.h"
@@ -22,7 +21,8 @@ inline void runGo(const std::unique_ptr<CommandArgs> &args, Engine &engine)
     engine.goPerft(static_cast<uint32_t>(depth));
     auto end = std::chrono::system_clock::now();
     auto duration =
-        duration_cast<std::chrono::milliseconds>(end - start).count();
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+            .count();
     std::cout << "Execution time: " << duration << " ms\n";
   }
   // Do other go commands
@@ -99,7 +99,7 @@ void CommandArgs::print() const
   }
 }
 
-size_t CommandArgs::size() const
+std::size_t CommandArgs::size() const
 {
   if (!m_next)
   {
@@ -117,16 +117,17 @@ void EngineParser::receiveInput()
   if (m_mode == EngineMode::UCI)
   {
     // Do uci stuff
-    if (args.getArg() == "go")
-    {
-      UCI::runGo(args.getNext(), m_engine);
-    }
-    else if (args.getArg() == "d")
-    {
-      GUI::print_pieces(m_engine.getPos());
-    }
   }
-  if (args.getArg() == "position")
+
+  if (args.getArg() == "go")
+  {
+    UCI::runGo(args.getNext(), m_engine);
+  }
+  else if (args.getArg() == "d")
+  {
+    GUI::print_pieces(m_engine.getPos());
+  }
+  else if (args.getArg() == "position")
   {
     setPosition(*args.getNext(), m_engine);
   }

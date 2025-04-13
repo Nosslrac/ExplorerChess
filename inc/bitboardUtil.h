@@ -18,9 +18,6 @@
 #define getPromo(move) ((move >> 16U) & 0x3U)
 #define BB(i) (1ULL << i)
 
-using move_t = uint32_t;
-using bitboard_t = uint64_t;
-
 enum Piece
 {
   King = 10,
@@ -58,43 +55,47 @@ enum Flags
 };
 
 constexpr bitboard_t FileA = 0x0101010101010101ULL;
-constexpr bitboard_t FileB = FileA << 1;
-constexpr bitboard_t FileC = FileA << 2;
-constexpr bitboard_t FileD = FileA << 3;
-constexpr bitboard_t FileE = FileA << 4;
-constexpr bitboard_t FileF = FileA << 5;
-constexpr bitboard_t FileG = FileA << 6;
-constexpr bitboard_t FileH = FileA << 7;
+constexpr bitboard_t FileB = FileA << 1U;
+constexpr bitboard_t FileC = FileA << 2U;
+constexpr bitboard_t FileD = FileA << 3U;
+constexpr bitboard_t FileE = FileA << 4U;
+constexpr bitboard_t FileF = FileA << 5U;
+constexpr bitboard_t FileG = FileA << 6U;
+constexpr bitboard_t FileH = FileA << 7U;
 
 constexpr bitboard_t Rank1 = 0xFF;
-constexpr bitboard_t Rank2 = Rank1 << (8 * 1);
-constexpr bitboard_t Rank3 = Rank1 << (8 * 2);
-constexpr bitboard_t Rank4 = Rank1 << (8 * 3);
-constexpr bitboard_t Rank5 = Rank1 << (8 * 4);
-constexpr bitboard_t Rank6 = Rank1 << (8 * 5);
-constexpr bitboard_t Rank7 = Rank1 << (8 * 6);
-constexpr bitboard_t Rank8 = Rank1 << (8 * 7);
+constexpr bitboard_t Rank2 = Rank1 << (8 * 1U);
+constexpr bitboard_t Rank3 = Rank1 << (8 * 2U);
+constexpr bitboard_t Rank4 = Rank1 << (8 * 3U);
+constexpr bitboard_t Rank5 = Rank1 << (8 * 4U);
+constexpr bitboard_t Rank6 = Rank1 << (8 * 5U);
+constexpr bitboard_t Rank7 = Rank1 << (8 * 6U);
+constexpr bitboard_t Rank8 = Rank1 << (8 * 7U);
 
+//---------- Usful constants------------------------
 constexpr uint8_t NoEP = 0;
 constexpr bitboard_t All_SQ = ~0ULL;
 constexpr int CHECK_MATE = -0xFFFF;
 constexpr int BLACK = 5;
 constexpr int WHITE = 0;
+constexpr int BOARD_DIMMENSION = 8;
+constexpr std::size_t MAX_MOVES = 100;
 
 //---------CASTLING SQUARES--------------------------
 
-constexpr bitboard_t WHITE_QUEEN_PIECES = BB(59) | BB(58) | BB(57);
-constexpr bitboard_t WHITE_KING_PIECES = BB(61) | BB(62);
-constexpr bitboard_t BLACK_QUEEN_PIECES = BB(1) | BB(2) | BB(3);
-constexpr bitboard_t BLACK_KING_PIECES = BB(6) | BB(5);
+constexpr bitboard_t WHITE_QUEEN_PIECES = BB(59U) | BB(58U) | BB(57U);
+constexpr bitboard_t WHITE_KING_PIECES = BB(61U) | BB(62U);
+constexpr bitboard_t BLACK_QUEEN_PIECES = BB(1U) | BB(2U) | BB(3U);
+constexpr bitboard_t BLACK_KING_PIECES = BB(6U) | BB(5U);
 
 // Attacked squares differ from occupied on queenside, also add king square
 // since king can't be in check
-constexpr bitboard_t WHITE_ATTACK_QUEEN = WHITE_QUEEN_PIECES ^ BB(57) ^ BB(60);
-constexpr bitboard_t BLACK_ATTACK_QUEEN = BLACK_QUEEN_PIECES ^ BB(1) ^ BB(4);
+constexpr bitboard_t WHITE_ATTACK_QUEEN =
+    WHITE_QUEEN_PIECES ^ BB(57U) ^ BB(60U);
+constexpr bitboard_t BLACK_ATTACK_QUEEN = BLACK_QUEEN_PIECES ^ BB(1U) ^ BB(4U);
 
-constexpr bitboard_t WHITE_ATTACK_KING = WHITE_KING_PIECES ^ BB(60);
-constexpr bitboard_t BLACK_ATTACK_KING = BLACK_KING_PIECES ^ BB(4);
+constexpr bitboard_t WHITE_ATTACK_KING = WHITE_KING_PIECES ^ BB(60U);
+constexpr bitboard_t BLACK_ATTACK_KING = BLACK_KING_PIECES ^ BB(4U);
 
 // TODO: implement 50 move rule
 struct StateInfo
@@ -110,15 +111,15 @@ struct StateInfo
 
   // Incremental
   bitboard_t hashKey;
-  int16_t materialScore;
-  int16_t materialValue;
+  score_t materialScore;
+  score_t materialValue;
 };
 
 // Inherits irreversible info from StateInfo
 struct Position
 {
   StateInfo st;
-  uint8_t kings[2];
+  square_t kings[2];
   bitboard_t pieceBoards[10];
   bitboard_t teamBoards[3];
 
@@ -157,19 +158,19 @@ inline int pext(bitboard_t BB, bitboard_t mask)
 #endif
 }
 
-inline int bitCount(bitboard_t BB)
+inline uint8_t bitCount(bitboard_t BB)
 {
 #if __has_builtin(__builtin_popcountll)
-  return __builtin_popcountll(BB);
+  return static_cast<uint8_t>(__builtin_popcountll(BB));
 #else
   return 0; // Impl needed
 #endif
 }
 
-inline int bitScan(bitboard_t BB)
+inline uint8_t bitScan(bitboard_t BB)
 {
 #if __has_builtin(__builtin_ctzll)
-  return __builtin_ctzll(BB);
+  return static_cast<uint8_t>(__builtin_ctzll(BB));
 #else
   return 0; // Impl needed
 #endif
@@ -184,10 +185,13 @@ template <bool white>
 inline uint8_t getPiece(const bitboard_t pieces[], const uint8_t sq)
 {
   const bitboard_t fromBB = BB(sq);
-  for (int i = 5 * !white; i < 5 + 5 * !white; ++i)
+  constexpr uint8_t last = BLACK + BLACK * !white;
+  for (uint8_t i = BLACK * !white; i < last; ++i)
   {
     if (pieces[i] & fromBB)
+    {
       return i;
+    }
   }
   return white ? King : King + 1;
 }
@@ -210,15 +214,17 @@ template <bool whiteToMove, Direction D> bitboard_t shift(bitboard_t b)
   }
 }
 // Squares infront of pawn
-template <bool white> inline bitboard_t forwardSquares(uint8_t sq)
+template <bool white> inline bitboard_t forwardSquares(square_t sq)
 {
   if constexpr (white)
   {
-    return All_SQ >> ((8 - sq / 8) * 8);
+    return All_SQ >>
+           ((BOARD_DIMMENSION - sq / BOARD_DIMMENSION) * BOARD_DIMMENSION);
   }
   else
   {
-    return All_SQ << ((sq / 8) * 8 + 8);
+    return All_SQ << ((sq / BOARD_DIMMENSION) * BOARD_DIMMENSION +
+                      BOARD_DIMMENSION);
   }
 }
 
@@ -251,8 +257,10 @@ template <bool white, bool kingSide> bool isAttacked(bitboard_t attack)
 template <bool whiteToMove> inline bitboard_t EPpawns(const Position &pos)
 {
   if constexpr (whiteToMove)
-    return Rank4 & pos.pieceBoards[0];
-  return Rank5 & pos.pieceBoards[5];
+  {
+    return Rank4 & pos.pieceBoards[WHITE];
+  }
+  return Rank5 & pos.pieceBoards[BLACK];
 }
 
 inline bool moreThanOne(bitboard_t b) { return b & (b - 1); }

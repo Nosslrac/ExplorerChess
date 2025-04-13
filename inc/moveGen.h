@@ -1,5 +1,6 @@
 #pragma once
 #include "bitboardUtil.h"
+#include "types.h"
 
 #ifdef PEXT
 #include "attackPext.h"
@@ -35,7 +36,7 @@ public:
   void generatePieceMoves(const Position &pos, MoveList &move_list) const;
 
   // Move to private when working
-  template <Piece p> inline bitboard_t stepAttackBB(uint8_t square) const
+  template <Piece p> inline bitboard_t stepAttackBB(square_t square) const
   {
     static_assert(p == Knight || p == King);
     if constexpr (p == Knight)
@@ -49,7 +50,8 @@ public:
   }
 
   template <Piece p>
-  inline bitboard_t attackBB(const bitboard_t board, const uint8_t square) const
+  inline bitboard_t attackBB(const bitboard_t board,
+                             const square_t square) const
   {
     if constexpr (p == Bishop)
     {
@@ -109,18 +111,18 @@ private:
   //------------------Helper lookups------------------------------
 
 #ifdef PEXT
-  inline bitboard_t rookAttack(bitboard_t board, uint8_t square) const
+  inline bitboard_t rookAttack(bitboard_t board, square_t square) const
   {
     return rookAttackPtr[square][pext(board, rookBits[square])];
   }
 
-  inline bitboard_t bishopAttack(bitboard_t board, uint8_t square) const
+  inline bitboard_t bishopAttack(bitboard_t board, square_t square) const
   {
     return bishopAttackPtr[square][pext(board, bishopBits[square])];
   }
 
 #else
-  inline bitboard_t bishopAttack(bitboard_t board, uint8_t square) const
+  inline bitboard_t bishopAttack(bitboard_t board, square_t square) const
   {
     board &= m_bishopMasks[square];
     board *= m_bishopMagicBitboard[square];
@@ -128,7 +130,7 @@ private:
     return m_bishopAttacks[square][board];
   }
 
-  inline bitboard_t rookAttack(bitboard_t board, uint8_t square) const
+  inline bitboard_t rookAttack(bitboard_t board, square_t square) const
   {
     board &= m_rookMasks[square];
     board *= m_rookMagicBitboard[square];
@@ -147,7 +149,9 @@ private:
   constexpr inline bitboard_t getTeam(const Position &pos) const
   {
     if constexpr (white)
+    {
       return pos.teamBoards[1];
+    }
     return pos.teamBoards[2];
   }
 
@@ -155,7 +159,9 @@ private:
   constexpr inline bitboard_t moveableSquares(const Position &pos) const
   {
     if constexpr (whiteToMove)
+    {
       return ~pos.teamBoards[1];
+    }
     return ~pos.teamBoards[2];
   }
 

@@ -24,11 +24,11 @@ private:
 class CommandArgs
 {
 public:
-  explicit CommandArgs(const std::string &remainder, const bool takeArg);
+  explicit CommandArgs(const std::string &commandLine, const bool takeArg);
   CommandArgs() = delete;
   ~CommandArgs() = default;
   void print() const;
-  size_t size() const;
+  std::size_t size() const;
   const std::string &getArg() const { return m_argument; }
   const std::unique_ptr<CommandArgs> &getNext() const { return m_next; };
 

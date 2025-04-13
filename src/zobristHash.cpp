@@ -10,28 +10,28 @@ void ZobristHash::initHash()
   std::uniform_int_distribution<bitboard_t> distribute(0, UINT64_MAX);
 
   // Init piece hash
-  for (int i = 0; i < 10; i++)
+  for (auto &hashPerPiece : pieceHash)
   {
-    for (int j = 0; j < 64; j++)
+    for (std::size_t j = 0; j < BOARD_DIMMENSION * BOARD_DIMMENSION; j++)
     {
-      pieceHash[i][j] = distribute(generator);
+      hashPerPiece[j] = distribute(generator);
     }
   }
   // Init king hash
-  for (int i = 0; i < 2; i++)
+  for (std::size_t i = 0; i < 2; i++)
   {
-    for (int j = 0; j < 64; j++)
+    for (std::size_t j = 0; j < BOARD_DIMMENSION * BOARD_DIMMENSION; j++)
     {
       kingHash[i][j] = distribute(generator);
     }
   }
   // Init ep hash
-  for (int i = 0; i < 8; i++)
+  for (std::size_t i = 0; i < 8; i++)
   {
     epHash[i] = distribute(generator);
   }
   // Castle hash and move hash
-  for (int i = 0; i < 16; i++)
+  for (std::size_t i = 0; i < 16; i++)
   {
     castleHash[i] = distribute(generator);
   }
@@ -54,7 +54,7 @@ bitboard_t ZobristHash::hashPosition(const Position &pos)
     bitboard_t pieces = pos.pieceBoards[i];
     while (pieces)
     {
-      int nextSquare = bitScan(pieces);
+      const auto nextSquare = bitScan(pieces);
       posHash ^= pieceHash[i][nextSquare];
       pieces &= pieces - 1;
     }

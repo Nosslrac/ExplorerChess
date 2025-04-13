@@ -12,7 +12,7 @@
 namespace magicalBits {
 MagicalBitboards::MagicalBitboards() { initSliderAttacks(); }
 
-bitboard_t MagicalBitboards::getMask(uint8_t square)
+bitboard_t MagicalBitboards::getMask(square_t square)
 {
   return m_bishopMasks[square];
 }
@@ -163,10 +163,9 @@ bitboard_t MagicalBitboards::setOccupancy(uint32_t position, uint8_t bitCount,
 {
   bitboard_t occupancy = 0ULL;
 
-  unsigned long square;
   for (uint32_t count = 0; count < bitCount; count++)
   {
-    square = bitScan(attackMask);
+    const auto square = bitScan(attackMask);
     attackMask &= attackMask - 1;
 
     if (position & (1 << count))

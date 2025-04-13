@@ -13,7 +13,7 @@ class MagicalBitboards
 public:
   MagicalBitboards();
 
-  bitboard_t getMask(uint8_t square);
+  bitboard_t getMask(square_t square);
 
   static bitboard_t findMagicNumber(
       uint32_t position, uint8_t bitCount,

@@ -4,6 +4,7 @@
 #include "bitboardUtil.h"
 #include "moveGen.h"
 #include "robin_hood.h"
+#include "types.h"
 
 class Evaluation
 {
@@ -26,8 +27,8 @@ public:
   inline int getPieceValue(int8_t index) { return pieceValue[index]; }
 
   // Material balance
-  int initMaterialValue(const Position &pos) const;
-  int staticPieceEvaluation(const bitboard_t piece[10]) const;
+  score_t initMaterialValue(const Position &pos) const;
+  score_t staticPieceEvaluation(const bitboard_t piece[10]) const;
 
 private:
   uint16_t pieceValue[5] = {100, 300, 300, 500, 900};

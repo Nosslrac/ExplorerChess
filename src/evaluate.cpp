@@ -1,4 +1,5 @@
 #include "evaluate.h"
+#include "types.h"
 
 Evaluation::Evaluation(const MoveGen &moveGen) : m_moveGen(moveGen) {}
 
@@ -15,7 +16,7 @@ template <bool whiteToMove> int Evaluation::evaluate(const Position &pos) const
 /**
  * NOTE: only call on initialization
  */
-int Evaluation::staticPieceEvaluation(const bitboard_t pieces[10]) const
+score_t Evaluation::staticPieceEvaluation(const bitboard_t pieces[10]) const
 {
   int materialBalance = 0;
   for (int i = 0; i < 5; ++i)
@@ -23,7 +24,7 @@ int Evaluation::staticPieceEvaluation(const bitboard_t pieces[10]) const
     materialBalance +=
         (bitCount(pieces[i]) - bitCount(pieces[i + 5])) * pieceValue[i];
   }
-  return materialBalance;
+  return static_cast<score_t>(materialBalance);
 }
 
 template <bool whiteToMove>
@@ -40,11 +41,11 @@ int Evaluation::undefendedPieces(const Position &pos) const
 /**
  * NOTE: only call on initialization
  */
-int Evaluation::initMaterialValue(const Position &pos) const
+score_t Evaluation::initMaterialValue(const Position &pos) const
 {
   int whiteValue = 0;
   int blackValue = 0;
-  for (uint8_t i = 0; i < 64; ++i)
+  for (std::size_t i = 0; i < BOARD_DIMMENSION * BOARD_DIMMENSION; ++i)
   {
     if (pos.kings[0] == i)
     {
@@ -63,7 +64,7 @@ int Evaluation::initMaterialValue(const Position &pos) const
       blackValue += PSTs[getPiece<false>(pos.pieceBoards, i)][i];
     }
   }
-  return whiteValue - blackValue;
+  return static_cast<score_t>(whiteValue - blackValue);
 }
 
 template <bool whiteToMove>
@@ -103,10 +104,9 @@ int Evaluation::passedPawns(const bitboard_t piece[10]) const
   bitboard_t pawns = piece[team];
   const bitboard_t enemyPawns = piece[enemy];
   int score = 0;
-  unsigned long sq;
   while (pawns)
   {
-    sq = bitScan(pawns);
+    const auto sq = bitScan(pawns);
     const bitboard_t forwardSQ =
         adjacentFiles[sq & 7] & forwardSquares<whiteToMove>(sq);
     if (forwardSQ & enemyPawns)

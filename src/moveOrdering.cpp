@@ -7,12 +7,10 @@ void MoveOrder::moveSort(MoveList &move_list, const Position &, int)
 
 void MoveOrder::captureSort(MoveList &move_list)
 {
-  uint32_t move;
-  int j;
-  for (int i = 1; i < move_list.size(); ++i)
+  for (std::size_t i = 1; i < move_list.size(); ++i)
   {
-    move = move_list.moves[i];
-    j = i - 1;
+    const auto move = move_list.moves[i];
+    auto j = i - 1;
 
     while (j >= 0 && captureScore(move, move_list.moves[j]))
     {
@@ -27,7 +25,7 @@ inline bool MoveOrder::captureScore(uint32_t move1, uint32_t move2)
 {
   const int capture1 = getCaptured(move1);
   const int capture2 = getCaptured(move2);
-  const bool bothCapture = (move1 & move2) & CAPTURE;
+  const bool bothCapture = ((move1 & move2) & CAPTURE) == CAPTURE;
   const bool onlyFirstCapture =
       ((move1 & CAPTURE) - (move2 & CAPTURE)) == CAPTURE;
 

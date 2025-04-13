@@ -241,7 +241,7 @@ bitboard_t Engine::perft(Position &pos, uint32_t depth) {
 
 #ifndef SHALLOW_SEARCH
   if (depth < 2) {
-    for (int i = 0; i < move_list.size(); ++i) {
+    for (std::size_t i = 0; i < move_list.size(); ++i) {
       GUI::printMove(move_list.moves[i]);
       std::cout << ": " << 1 << std::endl;
     }
@@ -252,7 +252,7 @@ bitboard_t Engine::perft(Position &pos, uint32_t depth) {
   bitboard_t numPositions = 0;
 
   if (castle) {
-    for (int i = 0; i < move_list.size(); ++i) {
+    for (std::size_t i = 0; i < move_list.size(); ++i) {
 
       doMove<whiteToMove, true>(pos, move_list.moves[i]);
       const bitboard_t part = search<!whiteToMove, true>(pos, depth - 1);
@@ -264,7 +264,7 @@ bitboard_t Engine::perft(Position &pos, uint32_t depth) {
       undoMove<!whiteToMove, true>(pos, move_list.moves[i]);
     }
   } else {
-    for (int i = 0; i < move_list.size(); ++i) {
+    for (std::size_t i = 0; i < move_list.size(); ++i) {
 
       doMove<whiteToMove, false>(pos, move_list.moves[i]);
       const bitboard_t part = search<!whiteToMove, false>(pos, depth - 1);
@@ -300,7 +300,7 @@ bitboard_t Engine::search(Position &pos, int depth) {
     bitboard_t numPositions = 0;
     if constexpr (castle) {
       if (castleAllowed) {
-        for (int i = 0; i < move_list.size(); ++i) {
+        for (std::size_t i = 0; i < move_list.size(); ++i) {
           doMove<whiteToMove, true>(pos, move_list.moves[i]);
           numPositions += search<!whiteToMove, true>(pos, depth - 1);
           undoMove<!whiteToMove, true>(pos, move_list.moves[i]);
@@ -308,7 +308,7 @@ bitboard_t Engine::search(Position &pos, int depth) {
         return numPositions;
       }
     }
-    for (int i = 0; i < move_list.size(); ++i) {
+    for (std::size_t i = 0; i < move_list.size(); ++i) {
       doMove<whiteToMove, false>(pos, move_list.moves[i]);
       numPositions += search<!whiteToMove, false>(pos, depth - 1);
       undoMove<!whiteToMove, false>(pos, move_list.moves[i]);
@@ -325,7 +325,7 @@ bitboard_t Engine::search(Position &pos, int depth) {
   const bool castleAllowed =
       m_moveGen.generateAllMoves<whiteToMove, false>(pos, move_list);
   bitboard_t numPositions = 0;
-  for (int i = 0; i < move_list.size(); ++i) {
+  for (std::size_t i = 0; i < move_list.size(); ++i) {
     doMove<whiteToMove, true>(pos, move_list.moves[i]);
     numPositions += search<!whiteToMove, true>(pos, depth - 1);
     undoMove<!whiteToMove, true>(pos, move_list.moves[i]);
@@ -352,7 +352,7 @@ template <bool whiteToMove> Move Engine::analysis(Position &pos, int depth) {
       move_list.moves[0]}; // Initiate first move with worst possible eval
 
   if (castle) {
-    for (int i = 0; i < move_list.size(); ++i) {
+    for (std::size_t i = 0; i < move_list.size(); ++i) {
       doMove<whiteToMove, true>(pos, move_list.moves[i]);
       const int eval = -negaMax<!whiteToMove, true>(
           pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth - 1);
@@ -364,7 +364,7 @@ template <bool whiteToMove> Move Engine::analysis(Position &pos, int depth) {
       undoMove<!whiteToMove, true>(pos, move_list.moves[i]);
     }
   } else {
-    for (int i = 0; i < move_list.size(); ++i) {
+    for (std::size_t i = 0; i < move_list.size(); ++i) {
       doMove<whiteToMove, false>(pos, move_list.moves[i]);
       const int eval = -negaMax<!whiteToMove, false>(
           pos, CHECK_MATE - depth, -CHECK_MATE + depth, depth - 1);
@@ -409,7 +409,7 @@ int Engine::negaMax(Position &pos, int alpha, int beta, int depth) {
 
   if constexpr (castle) {
     if (castleAllowed) {
-      for (int i = 0; i < move_list.size(); ++i) {
+      for (std::size_t i = 0; i < move_list.size(); ++i) {
         doMove<whiteToMove, true>(pos, move_list.moves[i]);
         const int eval =
             -negaMax<!whiteToMove, true>(pos, -beta, -alpha, depth - 1);
@@ -422,7 +422,7 @@ int Engine::negaMax(Position &pos, int alpha, int beta, int depth) {
       return alpha;
     }
   }
-  for (int i = 0; i < move_list.size(); ++i) {
+  for (std::size_t i = 0; i < move_list.size(); ++i) {
     doMove<whiteToMove, false>(pos, move_list.moves[i]);
     const int eval =
         -negaMax<!whiteToMove, false>(pos, -beta, -alpha, depth - 1);
@@ -451,7 +451,7 @@ int Engine::qSearch(Position &pos, int alpha, int beta) {
     return stand_pat;
   }
 
-  for (int i = 0; i < moveList.size(); ++i) {
+  for (std::size_t i = 0; i < moveList.size(); ++i) {
     doMove<whiteToMove, false>(pos, moveList.moves[i]);
     const int eval = -qSearch<!whiteToMove>(pos, -beta, -alpha);
     undoMove<!whiteToMove, false>(pos, moveList.moves[i]);
@@ -467,7 +467,7 @@ template <bool whiteToMove, bool castle>
 void Engine::moveIntegrity(Position &pos) {
   MoveList m;
   m_moveGen.generateAllMoves<whiteToMove, false>(pos, m);
-  for (int i = 0; i < m.size(); ++i) {
+  for (std::size_t i = 0; i < m.size(); ++i) {
     const int materialValue = pos.st.materialValue;
     const int materialScore = pos.st.materialScore;
     doMove<whiteToMove, castle>(pos, m.moves[i]);
@@ -737,7 +737,7 @@ inline void Engine::doCastle(Position &pos) {
 }
 
 void Engine::fenInit(Position &pos, std::string fen) {
-  uint32_t sq{0};
+  square_t sq{0};
 
   char eP[2] = {};
   int epID = 0;
@@ -835,7 +835,7 @@ void Engine::fenInit(Position &pos, std::string fen) {
   if (!isdigit(eP[0])) {
     int file = eP[0] - 'a';
     int rank = 8 - eP[1] - '0';
-    pos.st.enPassant = file + 8 * rank;
+    pos.st.enPassant = static_cast<std::uint8_t>(file + 8 * rank);
   } else {
     pos.st.enPassant = NoEP;
   }

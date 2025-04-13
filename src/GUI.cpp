@@ -27,7 +27,7 @@ void print_pieces(const Position &pos)
   char pBoard[64];
   fillPieceArray(pos, pBoard);
   char rank = '8';
-  std::string stb = "";
+  std::string stb;
   stb += "\n +---+---+---+---+---+---+---+---+\n";
   for (int i = 0; i < 8; i++)
   {
@@ -79,13 +79,13 @@ void getPositionFen(const Position &pos)
   int empty = 0;
   std::string fen = "Fen: ";
 
-  for (int i = 0; i < 64; i++)
+  for (std::size_t i = 0; i < BOARD_DIMMENSION * BOARD_DIMMENSION; i++)
   {
-    if (i % 8 == 0 && i != 0)
+    if (i % BOARD_DIMMENSION == 0 && i != 0)
     {
-      if (empty)
+      if (empty != 0)
       {
-        fen += '0' + empty;
+        fen += static_cast<char>('0' + empty);
         empty = 0;
       }
       fen += '/';
@@ -132,7 +132,7 @@ void parseMove(uint32_t move)
 {
   char from = getFrom(move);
   char to = getTo(move);
-  Flags flags = (Flags)getFlags(move);
+  const auto flags = static_cast<Flags>(getFlags(move));
   char mover = getMover(move);
 
   char capped = getCaptured(move);
@@ -171,8 +171,8 @@ void parseMove(uint32_t move)
 
 void printMove(uint32_t move)
 {
-  std::string promo = "";
-  if (move & PROMO_N)
+  std::string promo;
+  if ((move & PROMO_N) == PROMO_N)
   {
     switch (getPromo(move))
     {
@@ -192,8 +192,10 @@ void printMove(uint32_t move)
   }
   int from = getFrom(move);
   int to = getTo(move);
-  std::cout << (char)(from % 8 + 'a') << (char)('8' - from / 8)
-            << (char)('a' + to % 8) << (char)('8' - to / 8) << promo;
+  std::cout << static_cast<char>(from % BOARD_DIMMENSION + 'a')
+            << static_cast<char>('8' - from / BOARD_DIMMENSION)
+            << static_cast<char>('a' + to % BOARD_DIMMENSION)
+            << static_cast<char>('8' - to / BOARD_DIMMENSION) << promo;
 }
 
 void printState(StateInfo &st)
@@ -210,12 +212,12 @@ void printState(StateInfo &st)
 
 void getCheckers(std::string &checkerSQ, bitboard_t checkerBB)
 {
-  unsigned long sq;
-  while (checkerBB)
+  int square{};
+  while (checkerBB != 0u)
   {
-    sq = bitScan(checkerBB);
-    checkerSQ += (char)(sq % 8 + 'a');
-    checkerSQ += (char)('8' - sq / 8);
+    square = bitScan(checkerBB);
+    checkerSQ += static_cast<char>(square % BOARD_DIMMENSION + 'a');
+    checkerSQ += static_cast<char>('8' - square / BOARD_DIMMENSION);
     checkerSQ += ' ';
     checkerBB &= checkerBB - 1;
   }
@@ -223,11 +225,15 @@ void getCheckers(std::string &checkerSQ, bitboard_t checkerBB)
 
 uint32_t findMove(MoveList &ml, std::string move) noexcept
 {
-  uint32_t from = (move.at(0) - 'a') + (8 - move.at(1) + '0') * 8;
-  uint32_t to = (move.at(2) - 'a') + (8 - move.at(3) + '0') * 8;
+  int from = (move.at(0) - 'a') +
+             (BOARD_DIMMENSION - move.at(1) + '0') * BOARD_DIMMENSION;
+  int to = (move.at(2) - 'a') +
+           (BOARD_DIMMENSION - move.at(3) + '0') * BOARD_DIMMENSION;
   uint8_t promo = 0;
   bool skipPromo = true;
-  if (move.length() >= 5)
+  constexpr int promotionIndex = 5;
+
+  if (move.length() >= promotionIndex)
   {
     switch (move.at(4))
     {
@@ -243,7 +249,7 @@ uint32_t findMove(MoveList &ml, std::string move) noexcept
     }
     skipPromo = false;
   }
-  for (int i = 0; i < ml.size(); ++i)
+  for (std::size_t i = 0; i < ml.size(); ++i)
   {
     const uint32_t curr = ml.moves[i];
     if (getFrom(curr) == from && getTo(curr) == to)
