@@ -10,12 +10,12 @@
 #define PEXT
 #endif
 
-#define getTo(move) (move & 0xFFU)
-#define getFrom(move) ((move >> 8U) & 0xFFU)
-#define getFlags(move) (move & 0xFF0000U)
-#define getMover(move) ((move >> 24U) & 0xFU)
-#define getCaptured(move) (move >> 28U)
-#define getPromo(move) ((move >> 16U) & 0x3U)
+// #define getTo(move) (move & 0xFFU)
+// #define getFrom(move) ((move >> 8U) & 0xFFU)
+// #define getFlags(move) (move & 0xFF0000U)
+// #define getMover(move) ((move >> 24U) & 0xFU)
+// #define getCaptured(move) (move >> 28U)
+// #define getPromo(move) ((move >> 16U) & 0x3U)
 #define BB(i) (1ULL << i)
 
 enum Piece
@@ -58,7 +58,7 @@ constexpr bitboard_t Rank8 = Rank1 << (8 * 7U);
 constexpr uint8_t NoEP = 0;
 constexpr bitboard_t All_SQ = ~0ULL;
 constexpr int CHECK_MATE = -0xFFFF;
-constexpr int BLACK = 5;
+constexpr int BLACK = 1;
 constexpr int WHITE = 0;
 constexpr int BOARD_DIMMENSION = 8;
 constexpr std::size_t MAX_MOVES = 100;
@@ -78,58 +78,6 @@ constexpr bitboard_t BLACK_ATTACK_QUEEN = BLACK_QUEEN_PIECES ^ BB(1U) ^ BB(4U);
 
 constexpr bitboard_t WHITE_ATTACK_KING = WHITE_KING_PIECES ^ BB(60U);
 constexpr bitboard_t BLACK_ATTACK_KING = BLACK_KING_PIECES ^ BB(4U);
-
-// TODO: implement 50 move rule
-struct StateInfo
-{
-  bitboard_t blockForKing;
-  bitboard_t pinnedMask;
-  bitboard_t enemyAttack;
-  bitboard_t checkers;
-
-  // uint8_t numCheckers;
-  uint8_t castlingRights;
-  uint8_t enPassant;
-
-  // Incremental
-  bitboard_t hashKey;
-  score_t materialScore;
-  score_t materialValue;
-};
-
-// Inherits irreversible info from StateInfo
-struct Position
-{
-  StateInfo st;
-  square_t kings[2];
-  bitboard_t pieceBoards[10];
-  bitboard_t teamBoards[3];
-
-  // Check boards
-  bitboard_t checkSquares[4];
-
-  bool whiteToMove;
-  uint16_t ply;
-  bool operator==(const Position &pos) const
-  {
-    return memcmp(this, &pos, sizeof(Position)) == 0;
-  }
-};
-
-struct MoveList
-{
-  move_t moves[100] = {};
-  uint8_t curr = 0;
-  inline void add(uint32_t move) { moves[curr++] = move; }
-  inline uint8_t size() const { return curr; }
-};
-
-struct Move
-{
-  int eval;
-  uint32_t move;
-  bool operator<(const Move &other) const { return other.eval < eval; }
-};
 
 inline int pext(bitboard_t BB, bitboard_t mask)
 {
@@ -235,17 +183,12 @@ template <bool white, bool kingSide> bool isAttacked(bitboard_t attack)
   }
 }
 
-// Return possible ep capturers
-template <bool whiteToMove> inline bitboard_t EPpawns(const Position &pos)
-{
-  if constexpr (whiteToMove)
-  {
-    return Rank4 & pos.pieceBoards[WHITE];
-  }
-  return Rank5 & pos.pieceBoards[BLACK];
-}
-
 inline bool moreThanOne(bitboard_t b) { return b & (b - 1); }
+
+constexpr bool isOnBoard(square_t square)
+{
+  return square >= SQ_A8 && square <= SQ_H1;
+}
 
 constexpr uint8_t castlingModifiers[64] = {
     0b0111, 0b1111, 0b1111, 0b1111, 0b0011, 0b1111, 0b1111, 0b1011,

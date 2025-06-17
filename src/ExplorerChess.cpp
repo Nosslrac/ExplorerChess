@@ -1,8 +1,10 @@
-#include "EngineInterface.h"
+// #include "EngineInterface.h"
+#include "attackPextV2.h"
 
 int main()
 {
-  ExplorerChess::EngineParser parser;
-  parser.runInterface();
+  ATTACKS::init();
+  // ExplorerChess::EngineParser parser;
+  // parser.runInterface();
   return 0;
 }
