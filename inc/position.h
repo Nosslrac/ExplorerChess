@@ -67,8 +67,9 @@ private:
 template <Side s> inline bitboard_t Position::EPpawns() const
 {
   return m_pieceBoards[PAWN] &
-         (s == Side::WHITE ? (Rank4 & m_teamBoards[WHITE])
-                           : (Rank5 & m_teamBoards[BLACK]));
+         (s == Side::WHITE
+              ? (BitboardUtil::Rank4 & m_teamBoards[BitboardUtil::WHITE])
+              : (BitboardUtil::Rank5 & m_teamBoards[BitboardUtil::BLACK]));
 }
 
 inline bitboard_t Position::pieces(PieceType pt) const
@@ -87,20 +88,20 @@ template <Side s> inline bool Position::hasPawnsOnEpRank() const
   return EPpawns<s>() != 0;
 }
 
+/// @note: Does not work for chess960
 template <Side s> inline void Position::doCastle(CastleSide castleSide)
 {
-  if constexpr (s == Side::WHITE)
-  {
-    const bitboard_t rookFromTo =
-        castleSide == CastleSide::KING ? BB(63U) | BB(61U) : BB(56U) | BB(59U);
-    m_pieceBoards[ROOK] ^= rookFromTo;
-    m_teamBoards[WHITE] ^= rookFromTo;
-  }
-  else
-  {
-    const bitboard_t rookFromTo =
-        castleSide == CastleSide::KING ? BB(7U) | BB(5U) : BB(0U) | BB(3U);
-    m_pieceBoards[ROOK] ^= rookFromTo;
-    m_teamBoards[BLACK] ^= rookFromTo;
-  }
+  constexpr int side =
+      s == Side::WHITE ? BitboardUtil::WHITE : BitboardUtil::BLACK;
+  constexpr bitboard_t kingCastle = s == Side::WHITE
+                                        ? BitboardUtil::WHITE_KING_ROOK_FROM_TO
+                                        : BitboardUtil::BLACK_KING_ROOK_FROM_TO;
+  constexpr bitboard_t queenCastle =
+      s == Side::WHITE ? BitboardUtil::WHITE_QUEEN_ROOK_FROM_TO
+                       : BitboardUtil::BLACK_QUEEN_ROOK_FROM_TO;
+
+  const bitboard_t rookFromTo =
+      castleSide == CastleSide::KING ? kingCastle : queenCastle;
+  m_pieceBoards[ROOK] ^= rookFromTo;
+  m_teamBoards[side] ^= rookFromTo;
 }

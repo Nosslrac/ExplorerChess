@@ -16,7 +16,7 @@
 // #define getMover(move) ((move >> 24U) & 0xFU)
 // #define getCaptured(move) (move >> 28U)
 // #define getPromo(move) ((move >> 16U) & 0x3U)
-#define BB(i) (1ULL << i)
+#define BB(i) (1UL << i)
 
 enum Piece
 {
@@ -35,6 +35,8 @@ enum Direction
   UP_LEFT,
   UP_RIGHT
 };
+
+namespace BitboardUtil {
 
 constexpr bitboard_t FileA = 0x0101010101010101ULL;
 constexpr bitboard_t FileB = FileA << 1U;
@@ -57,6 +59,8 @@ constexpr bitboard_t Rank8 = Rank1 << (8 * 7U);
 //---------- Usful constants------------------------
 constexpr uint8_t NoEP = 0;
 constexpr bitboard_t All_SQ = ~0ULL;
+constexpr bitboard_t NOT_EDGE =
+    (Rank2 | Rank3 | Rank4 | Rank5 | Rank6 | Rank7) & ~FileA & ~FileH;
 constexpr int CHECK_MATE = -0xFFFF;
 constexpr int BLACK = 1;
 constexpr int WHITE = 0;
@@ -67,8 +71,13 @@ constexpr std::size_t MAX_MOVES = 100;
 
 constexpr bitboard_t WHITE_QUEEN_PIECES = BB(59U) | BB(58U) | BB(57U);
 constexpr bitboard_t WHITE_KING_PIECES = BB(61U) | BB(62U);
+constexpr bitboard_t WHITE_KING_ROOK_FROM_TO = BB(63U) | BB(61U);
+constexpr bitboard_t WHITE_QUEEN_ROOK_FROM_TO = BB(56U) | BB(59U);
+
 constexpr bitboard_t BLACK_QUEEN_PIECES = BB(1U) | BB(2U) | BB(3U);
 constexpr bitboard_t BLACK_KING_PIECES = BB(6U) | BB(5U);
+constexpr bitboard_t BLACK_KING_ROOK_FROM_TO = BB(7U) | BB(5U);
+constexpr bitboard_t BLACK_QUEEN_ROOK_FROM_TO = BB(0U) | BB(3U);
 
 // Attacked squares differ from occupied on queenside, also add king square
 // since king can't be in check
@@ -190,6 +199,8 @@ constexpr bool isOnBoard(square_t square)
   return square >= SQ_A8 && square <= SQ_H1;
 }
 
+constexpr std::uint8_t fileOf(square_t square) { return square & 7U; }
+
 constexpr uint8_t castlingModifiers[64] = {
     0b0111, 0b1111, 0b1111, 0b1111, 0b0011, 0b1111, 0b1111, 0b1011,
     0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111,
@@ -253,3 +264,5 @@ constexpr bitboard_t adjacentFiles[8] = {files[0] | files[1],
                                          files[4] | files[5] | files[6],
                                          files[5] | files[6] | files[7],
                                          files[6] | files[7]};
+
+} // namespace BitboardUtil

@@ -10,14 +10,17 @@
 
 namespace {
 
-constexpr bool doesClip(square_t start, square_t end)
+constexpr bool isBoardEdge(square_t start)
 {
-  return std::abs(start % BOARD_DIMMENSION - end % BOARD_DIMMENSION) > 1;
+  return (BB(start) & ~BitboardUtil::NOT_EDGE) != 0;
 }
 
-constexpr bool isBoardEdge(square_t start, int dir)
+constexpr bool doesClip(square_t start, int dir)
 {
-  return isOnBoard(start) && doesClip(start, square_t(start + dir));
+  return !BitboardUtil::isOnBoard(start + dir) ||
+         (isBoardEdge(start) &&
+          std::abs(BitboardUtil::fileOf(start) -
+                   BitboardUtil::fileOf(start + dir)) > 1);
 }
 
 bitboard_t relevantBits(PieceType pt, square_t square)
@@ -32,20 +35,23 @@ bitboard_t relevantBits(PieceType pt, square_t square)
   for (const auto dir : dirs)
   {
     auto tempSquare = square;
-    if (abs((tempSquare & 7) - ((tempSquare + dir) & 7)) < 2)
+    if (doesClip(tempSquare, dir))
     {
-      while (!isBoardEdge(square_t(tempSquare + dir), dir))
-      {
-        tempSquare += dir;
-        board |= BB(tempSquare);
-      }
+      continue;
+    }
+
+    while (!doesClip(square_t(tempSquare + dir), dir))
+    {
+      tempSquare += dir;
+      board |= BB(tempSquare);
     }
   }
   return board;
 }
 
 // Return the rooks attacks for the current occupancy and square
-bitboard_t slidingAttackSlow(PieceType pt, bitboard_t board, square_t square)
+bitboard_t slidingAttackSlow(PieceType pt, bitboard_t occupancy,
+                             square_t square)
 {
   std::array<int, 4> dirs = pt == BISHOP ? std::array<int, 4>{-7, -9, 7, 9}
                                          : std::array<int, 4>{-1, 1, -8, 8};
@@ -53,14 +59,16 @@ bitboard_t slidingAttackSlow(PieceType pt, bitboard_t board, square_t square)
 
   for (const auto dir : dirs)
   {
-    int tempSquare = square;
-    if (abs((tempSquare & 7) - ((tempSquare + dir) & 7)) < 2)
+    square_t tempSquare = square;
+    if (doesClip(tempSquare, dir))
     {
-      while (!boardEdge(tempSquare, dir) && (board & BB(tempSquare)) == 0)
-      {
-        tempSquare += dir;
-        attack |= BB(tempSquare);
-      }
+      continue;
+    }
+
+    while (!doesClip(tempSquare, dir) && (occupancy & BB(tempSquare)) == 0)
+    {
+      tempSquare += dir;
+      attack |= BB(tempSquare);
     }
   }
   return attack;
@@ -71,7 +79,7 @@ bitboard_t setOccupancy(bitboard_t relevantBits, int pextIndex)
   bitboard_t occupancy = 0ULL;
   while (pextIndex != 0)
   {
-    const auto sq = bitScan(relevantBits);
+    const auto sq = BitboardUtil::bitScan(relevantBits);
     relevantBits &= relevantBits - 1;
     occupancy |= (pextIndex & 1) * BB(sq);
     pextIndex >>= 1;
@@ -79,37 +87,20 @@ bitboard_t setOccupancy(bitboard_t relevantBits, int pextIndex)
   return occupancy;
 }
 
-template <PieceType p> consteval int getArenaSize()
-{
-  static_assert(p == ROOK || p == BISHOP, "Invalid pieceType in getArenaSize");
-
-  std::array<int, 4> dirs = p == ROOK ? std::array<int, 4>{1, -1, 8, -8}
-                                      : std::array<int, 4>{-7, -9, 7, 9};
-  int sum = 0;
-  for (const auto dir : dirs)
-  {
-    sum += dir + 1;
-  }
-  return sum;
-}
-
 // Storage area for rook- and bishop attacks
-constexpr int rookSize = getArenaSize<ROOK>();
-constexpr int bishopSize = getArenaSize<BISHOP>();
-bitboard_t RookArena[rookSize];
-bitboard_t BishopArena[bishopSize];
+bitboard_t RookArena[102400];
+bitboard_t BishopArena[5248];
 
 void init_attack_table(PieceType pt, bitboard_t table[],
                        PEXT_ATTACK::Magic attacks[][2])
 {
   int size = 0;
-
   for (square_t square = SQ_A8; square <= SQ_H1; square++)
   {
-    PEXT_ATTACK::Magic &m = attacks[square][pt - BISHOP]; // TODO: fix
+    PEXT_ATTACK::Magic &m = attacks[square][pt - BISHOP];
 
     m.relBits = relevantBits(pt, square);
-    const int bits = bitCount(m.relBits);
+    const int bits = BitboardUtil::bitCount(m.relBits);
     assert(bits < 13);
 
     m.attacks = square == SQ_A8
@@ -124,7 +115,7 @@ void init_attack_table(PieceType pt, bitboard_t table[],
       const bitboard_t attack = slidingAttackSlow(pt, occupancy, square);
       m.attacks[i] = attack;
       // Verify correct setup
-      assert(pext(occupancy, m.relBits) == i);
+      assert(BitboardUtil::pext(occupancy, m.relBits) == i);
     }
     size = combinations;
   }
@@ -139,7 +130,7 @@ alignas(64) Magic ATTACK_MAGICS[SQ_COUNT][2]; // One for bishop, one for rooks
 
 void ATTACKS::init()
 {
-  std::cout << "Attack init complete\n";
   init_attack_table(BISHOP, BishopArena, PEXT_ATTACK::ATTACK_MAGICS);
   init_attack_table(ROOK, RookArena, PEXT_ATTACK::ATTACK_MAGICS);
+  std::cout << "Attack init complete\n";
 }

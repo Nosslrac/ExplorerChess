@@ -128,8 +128,8 @@ template <Side s> void Position::doMove(MoveV2 move)
     }
   }
 
-  m_st->castlingRights &= castlingModifiers[from];
-  m_st->castlingRights &= castlingModifiers[to];
+  m_st->castlingRights &= BitboardUtil::castlingModifiers[from];
+  m_st->castlingRights &= BitboardUtil::castlingModifiers[to];
 
   // Restore occupied
   // m_teamBoards[0] = pos.teamBoards[1] | pos.teamBoards[2];
