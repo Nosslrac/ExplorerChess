@@ -14,9 +14,14 @@ struct Magic
   bitboard_t relBits;
   bitboard_t *attacks;
 
-  int index(bitboard_t occupied) const
+  int index(bitboard_t occupancy) const
   {
-    return BitboardUtil::pext(occupied, relBits);
+    return BitboardUtil::pext(occupancy, relBits);
+  }
+
+  bitboard_t attackBB(bitboard_t occupancy) const
+  {
+    return attacks[index(occupancy)];
   }
 };
 

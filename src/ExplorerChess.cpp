@@ -2,12 +2,18 @@
 #include "attackPextV2.h"
 #include "bitboardUtilV2.h"
 #include "moveGenV2.h"
+#include "position.h"
 #include "types.h"
 #include <cstdio>
 
 int main()
 {
   ATTACKS::init();
+  Position pos{};
+  StateInfo st{};
+  pos.fenInit("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e3 0 1", st);
+  auto attackers = pos.attackOn(53, pos.pieces<ALL_PIECES>());
+  PseudoAttacks::print_bit_board(attackers);
   // for (int i = 0; i < 64; i++)
   // {
   //   if (i % 3 == 0)

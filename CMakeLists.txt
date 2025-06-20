@@ -12,7 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 set(RELEASE_FLAGS "-march=native -std=c++20 -O3 -DSHALLOW_SEARCH")
-set(DEBUG_FLAGS "-g -fsanitize=thread")
+set(DEBUG_FLAGS "-g -march=native -DSHALLOW_SEARCH -fsanitize=thread")
 set(BASE_FLAGS "-fomit-frame-pointer -pipe -pedantic -pedantic-errors -Werror \
     -Wall -Wextra -Wshadow -Wdeprecated -Wdiv-by-zero -Wfloat-equal \
     -Wfloat-conversion -Wsign-compare -Wpointer-arith -Wuninitialized \
@@ -23,7 +23,7 @@ set(BASE_FLAGS "-fomit-frame-pointer -pipe -pedantic -pedantic-errors -Werror \
     -Wmissing-include-dirs")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BASE_FLAGS} ${RELEASE_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BASE_FLAGS} ${DEBUG_FLAGS}")
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -49,9 +49,9 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 add_executable(ExplorerChessTest ${TEST_SOURCES})
 
 # Set specific compile flags for the test and main binary
-target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:RELEASE>:${RELEASE_FLAGS}> -DPRINT_OUT)
+# target_compile_options(${PROJECT_NAME} PUBLIC $<$<CONFIG:RELEASE>:${DEBUG_FLAGS}> -DPRINT_OUT)
 
-target_compile_options(ExplorerChessTest PUBLIC $<$<CONFIG:RELEASE>:${RELEASE_FLAGS}>)
+# target_compile_options(ExplorerChessTest PUBLIC $<$<CONFIG:RELEASE>:${RELEASE_FLAGS}>)
 
 target_link_libraries(ExplorerChessTest PUBLIC gtest gtest_main)
 

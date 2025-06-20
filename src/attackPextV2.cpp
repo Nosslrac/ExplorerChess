@@ -65,11 +65,11 @@ bitboard_t slidingAttackSlow(PieceType pt, bitboard_t occupancy,
       continue;
     }
 
-    while (!doesClip(tempSquare, dir) && (occupancy & BB(tempSquare)) == 0)
+    do
     {
       tempSquare += dir;
       attack |= BB(tempSquare);
-    }
+    } while (!doesClip(tempSquare, dir) && (occupancy & BB(tempSquare)) == 0);
   }
   return attack;
 }

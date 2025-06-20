@@ -25,13 +25,13 @@ bitboard_t attacks<KNIGHT>(const bitboard_t /*occupancy*/,
 template <>
 bitboard_t attacks<BISHOP>(const bitboard_t occupancy, const square_t square)
 {
-  return PEXT_ATTACK::ATTACK_MAGICS[square][0].index(occupancy);
+  return PEXT_ATTACK::ATTACK_MAGICS[square][0].attackBB(occupancy);
 }
 
 template <>
 bitboard_t attacks<ROOK>(const bitboard_t occupancy, const square_t square)
 {
-  return PEXT_ATTACK::ATTACK_MAGICS[square][1].index(occupancy);
+  return PEXT_ATTACK::ATTACK_MAGICS[square][1].attackBB(occupancy);
 }
 
 template <>
@@ -46,6 +46,12 @@ bitboard_t attacks(const bitboard_t /*occupancy*/, const square_t square)
 {
   return PseudoAttacks::PawnAttacks[static_cast<int>(s)][square];
 }
+
+// Explicit instantiations for pawns
+template bitboard_t attacks<Side::WHITE, PAWN>(const bitboard_t,
+                                               const square_t);
+template bitboard_t attacks<Side::BLACK, PAWN>(const bitboard_t,
+                                               const square_t);
 
 } // namespace MoveGen
 

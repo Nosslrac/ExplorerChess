@@ -1,45 +1,57 @@
 #pragma once
 #include "bitboardUtilV2.h"
 #include "types.h"
+#include <cassert>
 #include <string>
 
-struct StateInfo
+struct StateInfo final
 {
+  // Copied when making a move
+  uint8_t castlingRights;
+  square_t enPassant;
+  score_t materialScore;
+  score_t materialValue;
+
+  // Recomputed during doMove
   bitboard_t blockForKing;
   bitboard_t pinnedMask;
   bitboard_t enemyAttack;
   bitboard_t checkers;
 
-  // uint8_t numCheckers;
-  uint8_t castlingRights;
-  uint8_t enPassant;
-
-  // Incremental
   bitboard_t hashKey;
-  score_t materialScore;
-  score_t materialValue;
+  StateInfo *prevSt;
 };
 
 // Inherits irreversible info from StateInfo
-class Position
+class Position final
 {
 public:
+  explicit Position() = default;
+
   void init();
 
-  void fenInit(const std::string &fen, StateInfo *st);
-  void doMove(MoveV2 move);
+  void fenInit(const std::string &fen, StateInfo &st);
+  void doMove(MoveV2 move, StateInfo &newSt);
   void undoMove(MoveV2 move);
 
-  bitboard_t pieces(PieceType pt = ALL_PIECES) const;
-  template <typename... PieceTypes>
-  bitboard_t pieces(PieceType pt, PieceTypes... pts) const;
+  // Fetching pieceBoards and teamBoards (don't use with KING)
+  constexpr bitboard_t pieces(Side s) const;
+  template <PieceType... pts> constexpr bitboard_t pieces() const;
+  template <Side s, PieceType... pts> constexpr bitboard_t pieces() const;
+
+  bitboard_t attackOn(square_t square, bitboard_t board) const;
+
   template <Side s> bool hasPawnsOnEpRank() const;
 
   Position(const Position &) = delete;
   Position &operator=(const Position &) = delete;
 
+  // Utility and setup
+  void placePiece(PieceV2 piece, square_t square);
+  void printPieces(const std::string &fen) const;
+
 private:
-  template <Side s> void doMove(MoveV2 move);
+  template <Side s> void doMove(MoveV2 move, StateInfo &newSt);
   template <Side s> void undoMove(MoveV2 move);
 
   // Small inline methods
@@ -55,6 +67,7 @@ private:
   square_t m_kings[NUM_COLORS];
   bitboard_t m_pieceBoards[NUM_TYPES];
   bitboard_t m_teamBoards[NUM_COLORS];
+  PieceV2 m_board[SQ_COUNT];
 
   // Check boards
   bitboard_t m_checkSquares[4];
@@ -72,15 +85,25 @@ template <Side s> inline bitboard_t Position::EPpawns() const
               : (BitboardUtil::Rank5 & m_teamBoards[BitboardUtil::BLACK]));
 }
 
-inline bitboard_t Position::pieces(PieceType pt) const
+template <> inline constexpr bitboard_t Position::pieces<KING>() const
 {
-  return m_pieceBoards[pt];
+  return BB(m_kings[0]) | BB(m_kings[1]);
 }
 
-template <typename... PieceTypes>
-inline bitboard_t Position::pieces(PieceType pt, PieceTypes... pts) const
+inline constexpr bitboard_t Position::pieces(Side s) const
 {
-  return pieces(pt) | pieces(pts...);
+  return m_teamBoards[static_cast<std::uint8_t>(s)];
+}
+
+template <PieceType... pts> inline constexpr bitboard_t Position::pieces() const
+{
+  return (m_pieceBoards[pts] | ...);
+}
+
+template <Side s, PieceType... pts>
+inline constexpr bitboard_t Position::pieces() const
+{
+  return pieces(s) & pieces<pts...>();
 }
 
 template <Side s> inline bool Position::hasPawnsOnEpRank() const
@@ -104,4 +127,26 @@ template <Side s> inline void Position::doCastle(CastleSide castleSide)
       castleSide == CastleSide::KING ? kingCastle : queenCastle;
   m_pieceBoards[ROOK] ^= rookFromTo;
   m_teamBoards[side] ^= rookFromTo;
+}
+
+inline void Position::placePiece(PieceV2 piece, square_t square)
+{
+  assert(piece >= W_PAWN && piece <= B_KING);
+  assert(BitboardUtil::isOnBoard(square));
+  m_board[square] = piece;
+  if (piece < B_PAWN)
+  {
+    m_teamBoards[BitboardUtil::WHITE] |= BB(square);
+    m_pieceBoards[piece] |= BB(square);
+  }
+  else if (piece <= B_QUEEN)
+  {
+    m_teamBoards[BitboardUtil::BLACK] |= BB(square);
+    m_pieceBoards[piece - BitboardUtil::BLACK_OFFSET] |= BB(square);
+  }
+  else
+  {
+    m_kings[piece - W_KING] = square;
+  }
+  m_pieceBoards[ALL_PIECES] |= BB(square);
 }

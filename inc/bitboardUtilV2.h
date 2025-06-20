@@ -1,8 +1,11 @@
 #pragma once
+#include <array>
+#include <cassert>
 #include <immintrin.h>
 
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
+#include <string>
 
 #include "types.h"
 
@@ -17,16 +20,6 @@
 // #define getCaptured(move) (move >> 28U)
 // #define getPromo(move) ((move >> 16U) & 0x3U)
 #define BB(i) (1UL << i)
-
-enum Piece
-{
-  King = 10,
-  Pawn = 0,
-  Knight = 1,
-  Bishop = 2,
-  Rook = 3,
-  Queen = 4,
-};
 
 enum Direction
 {
@@ -64,6 +57,7 @@ constexpr bitboard_t NOT_EDGE =
 constexpr int CHECK_MATE = -0xFFFF;
 constexpr int BLACK = 1;
 constexpr int WHITE = 0;
+constexpr int BLACK_OFFSET = 5;
 constexpr int BOARD_DIMMENSION = 8;
 constexpr std::size_t MAX_MOVES = 100;
 
@@ -115,24 +109,9 @@ inline uint8_t bitScan(bitboard_t BB)
 #endif
 }
 
-template <Piece p> inline bitboard_t pieces(const bitboard_t pieces[])
+template <PieceV2 p> inline bitboard_t pieces(const bitboard_t pieces[])
 {
   return pieces[p] | pieces[BLACK + p];
-}
-
-template <bool white>
-inline uint8_t getPiece(const bitboard_t pieces[], const uint8_t sq)
-{
-  const bitboard_t fromBB = BB(sq);
-  constexpr uint8_t last = BLACK + BLACK * !white;
-  for (uint8_t i = BLACK * !white; i < last; ++i)
-  {
-    if (pieces[i] & fromBB)
-    {
-      return i;
-    }
-  }
-  return white ? King : King + 1;
 }
 
 template <bool whiteToMove, Direction D> bitboard_t shift(bitboard_t b)
@@ -201,7 +180,54 @@ constexpr bool isOnBoard(square_t square)
 
 constexpr std::uint8_t fileOf(square_t square) { return square & 7U; }
 
-constexpr uint8_t castlingModifiers[64] = {
+namespace TempGUI {
+
+inline constexpr square_t makeSquare(const std::array<char, 2> &move)
+{
+  assert(move.size() == 2);
+
+  return square_t(move.at(0) - 'a' + (('8' - move.at(1)) << 3U));
+}
+
+inline std::string getCastleRights(std::uint8_t castleRights,
+                                   std::string_view castleLetters)
+{
+  std::string castle;
+  for (auto i = 0; i < 4; i++)
+  {
+    if (castleRights & BB(i))
+    {
+      castle += castleLetters[i];
+    }
+  }
+  return castle;
+}
+
+inline std::string makeSquareNotation(square_t square)
+{
+  if (!isOnBoard(square) || square == SQ_NONE)
+  {
+    return "-";
+  }
+  return std::string({static_cast<char>('a' + (square & 7U)),
+                      static_cast<char>('8' - (square >> 3U))});
+}
+
+inline std::string makeMoveNotation(MoveV2 move)
+{
+  square_t from = move.getFrom();
+  square_t to = move.getTo();
+  if (!isOnBoard(from) || !isOnBoard(to))
+  {
+    return "(invalid move)";
+  }
+  return makeSquareNotation(from) + makeSquareNotation(to) +
+         " nbrq"[move.getPromo()];
+}
+
+} // namespace TempGUI
+
+constexpr uint8_t castlingModifiers[SQ_COUNT] = {
     0b0111, 0b1111, 0b1111, 0b1111, 0b0011, 0b1111, 0b1111, 0b1011,
     0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111,
     0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111,
