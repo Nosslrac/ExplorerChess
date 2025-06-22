@@ -1,12 +1,23 @@
 #include "moveGenV2.h"
 
 #include "attackPextV2.h"
+#include "position.h"
 #include "types.h"
 
 #include <iostream>
 #include <string>
 
 namespace MoveGen {
+
+template <MoveFilter filter, Side s>
+index_t generate(const Position &pos, Move *moveList)
+{
+  pos.attackOn(0, BB(7U));
+
+  *moveList++ = Move(0 | 213);
+
+  return 0;
+}
 
 // Template specializations for the attacks function
 template <>

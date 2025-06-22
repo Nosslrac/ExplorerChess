@@ -9,32 +9,56 @@
 #include "attacks.h"
 #endif
 
+#include <string>
+
 // clang-format off
+///
+/// @brief The structure of the move is as follows:
+/// bits 0-5: From square
+/// bits 6-11: To square
+/// bits 12-13: Promotion piece type if promotion, otherwise pawn double jump = 2
+/// bits 14-15: Special flags (quiet = 0, castling = 1, en passant = 2, promotion = 3)
 class Move final
 {
 public:
-  explicit Move(move_t m) : move(m) {}
-  [[nodiscard]] constexpr square_t getTo() const { return move & 0xFFU; }
-  [[nodiscard]] constexpr square_t getFrom() const { return (move >> 8U) & 0xFFU; }
-  [[nodiscard]] constexpr Flags getFlags() const { return static_cast<Flags>(move & 0xFF0000U); }
-  [[nodiscard]] constexpr square_t getMover() const { return (move >> 24U) & 0xFU; }
-  [[nodiscard]] constexpr square_t getCaptured() const { return move >> 28U; }
-  [[nodiscard]] constexpr square_t getPromo() const { return (move >> 16U) & 0x3U; }
+  constexpr explicit Move(move_t m) : move(m) {}
+  [[nodiscard]] constexpr square_t getTo() const { return move & 0x3FU; }
+  [[nodiscard]] constexpr square_t getFrom() const { return (move >> 6U) & 0x3FU; }
+  [[nodiscard]] constexpr bool isDoubleJump() const { return (move >> 12U) == 2; }
+  [[nodiscard]] constexpr bool isPromo() const { return (move >> 14U) == 3; }
+  [[nodiscard]] constexpr FlagsV2 getFlags() const { return static_cast<FlagsV2>(move & 0xC000U); }
+  [[nodiscard]] constexpr square_t getPromo() const { return (move >> 12U) & 0x3U; }
+
+
+  static constexpr Move make(square_t from, square_t to) {
+    return Move(move_t(from | (to << 6U)));
+  }
+
+  template<FlagsV2 flags>
+  static constexpr Move make(square_t from, square_t to, PieceType pt = KNIGHT) {
+    return Move(move_t(from | (to << 6U) | (pt - KNIGHT) << 12U | flags));
+  }
 
 private:
   move_t move;
 };
 // clang-format on
 
-struct MoveList
+enum class MoveFilter : std::uint8_t
 {
-  move_t moves[100] = {};
-  uint8_t curr = 0;
-  inline void add(uint32_t move) { moves[curr++] = move; }
-  inline uint8_t size() const { return curr; }
+  QUIETS,
+  CAPTURES,
+  CHECK_EVASIONS
 };
 
+class Position;
+
 namespace MoveGen {
+/// @brief Generate the possible moves
+template <MoveFilter filter>
+index_t generate(const Position &pos, Move *moveList);
+template <MoveFilter filter, Side s>
+index_t generate(const Position &pos, Move *moveList);
 
 /// @brief Gives the attack bitboard for a piece given
 /// the occupancy and start square
@@ -42,6 +66,18 @@ template <PieceType p>
 bitboard_t attacks(bitboard_t occupancy, square_t square);
 template <Side s, PieceType p>
 bitboard_t attacks(bitboard_t occupancy, square_t square);
+
+template <MoveFilter filter, Side... s> struct MoveList final
+{
+  explicit MoveList(const Position &pos)
+      : last(generate<filter, s...>(pos, moves)) {};
+  constexpr void add(move_t move) { moves[last++] = Move(move); }
+  constexpr index_t size() const { return last; }
+
+private:
+  Move moves[100];
+  index_t last;
+};
 
 } // namespace MoveGen
 
@@ -142,3 +178,50 @@ constexpr bitboard_t PawnAttacks[2][SQ_COUNT] = {
 
 void print_bit_board(bitboard_t b);
 } // namespace PseudoAttacks
+
+namespace TempGUI {
+
+inline constexpr square_t makeSquare(const std::array<char, 2> &move)
+{
+  assert(move.size() == 2);
+
+  return square_t(move.at(0) - 'a' + (('8' - move.at(1)) << 3U));
+}
+
+inline std::string getCastleRights(std::uint8_t castleRights,
+                                   std::string_view castleLetters)
+{
+  std::string castle;
+  for (std::size_t i = 0; i < 4; i++)
+  {
+    if (castleRights & BB(i))
+    {
+      castle += castleLetters[i];
+    }
+  }
+  return castle;
+}
+
+inline std::string makeSquareNotation(square_t square)
+{
+  if (!BitboardUtil::isOnBoard(square) || square == SQ_NONE)
+  {
+    return "-";
+  }
+  return std::string({static_cast<char>('a' + (square & 7U)),
+                      static_cast<char>('8' - (square >> 3U))});
+}
+
+inline std::string makeMoveNotation(Move move)
+{
+  square_t from = move.getFrom();
+  square_t to = move.getTo();
+  if (!BitboardUtil::isOnBoard(from) || !BitboardUtil::isOnBoard(to))
+  {
+    return "(invalid move)";
+  }
+  return makeSquareNotation(from) + makeSquareNotation(to) +
+         " nbrq"[move.getPromo()];
+}
+
+} // namespace TempGUI

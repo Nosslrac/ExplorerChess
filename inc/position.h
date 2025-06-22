@@ -1,5 +1,6 @@
 #pragma once
 #include "bitboardUtilV2.h"
+#include "moveGenV2.h"
 #include "types.h"
 #include <cassert>
 #include <string>
@@ -31,8 +32,8 @@ public:
   void init();
 
   void fenInit(const std::string &fen, StateInfo &st);
-  void doMove(MoveV2 move, StateInfo &newSt);
-  void undoMove(MoveV2 move);
+  void doMove(Move move, StateInfo &newSt);
+  void undoMove(Move move);
 
   // Fetching pieceBoards and teamBoards (don't use with KING)
   constexpr bitboard_t pieces(Side s) const;
@@ -51,8 +52,8 @@ public:
   void printPieces(const std::string &fen) const;
 
 private:
-  template <Side s> void doMove(MoveV2 move, StateInfo &newSt);
-  template <Side s> void undoMove(MoveV2 move);
+  template <Side s> void doMove(Move move, StateInfo &newSt);
+  template <Side s> void undoMove(Move move);
 
   // Small inline methods
   template <Side s> void doCastle(CastleSide castleSide);

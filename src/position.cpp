@@ -12,17 +12,17 @@
 #include <sstream>
 #include <string_view>
 
-template void Position::doMove<Side::WHITE>(MoveV2, StateInfo &);
-template void Position::doMove<Side::BLACK>(MoveV2, StateInfo &);
-template void Position::undoMove<Side::WHITE>(MoveV2);
-template void Position::undoMove<Side::BLACK>(MoveV2);
+template void Position::doMove<Side::WHITE>(Move, StateInfo &);
+template void Position::doMove<Side::BLACK>(Move, StateInfo &);
+template void Position::undoMove<Side::WHITE>(Move);
+template void Position::undoMove<Side::BLACK>(Move);
 
 namespace {
 constexpr std::string_view PieceIndexes(" PNBRQpnbrqKk");
 constexpr std::string_view CastlingIndexes("KQkq");
 } // namespace
 
-void Position::doMove(MoveV2 move, StateInfo &newSt)
+void Position::doMove(Move move, StateInfo &newSt)
 {
   if (m_whiteToMove)
   {
@@ -34,7 +34,7 @@ void Position::doMove(MoveV2 move, StateInfo &newSt)
   }
 }
 
-void Position::undoMove(MoveV2 move)
+void Position::undoMove(Move move)
 {
   if (m_whiteToMove)
   {
@@ -46,7 +46,7 @@ void Position::undoMove(MoveV2 move)
   }
 }
 
-template <Side s> void Position::doMove(MoveV2 move, StateInfo &newSt)
+template <Side s> void Position::doMove(Move move, StateInfo &newSt)
 {
 
   std::memcpy(
@@ -184,7 +184,7 @@ template <Side s> void Position::doMove(MoveV2 move, StateInfo &newSt)
   // m_moveGen.setCheckSquares<!whiteToMove>(pos);
 }
 
-template <Side s> void Position::undoMove(MoveV2 move)
+template <Side s> void Position::undoMove(Move move)
 {
   const square_t from = move.getFrom();
   const square_t to = move.getTo();
@@ -231,7 +231,8 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
       square += (token - '0');
     }
     else if (token == '/')
-    {}
+    {
+    }
     else if ((id = PieceIndexes.find(token)) != std::string::npos)
     {
       placePiece(PieceV2(id), square);
@@ -260,8 +261,7 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
       (stream >> epRow) && (m_whiteToMove ? '6' : '3') == epRow)
   {
     std::cout << epCol << epRow;
-    m_st->enPassant =
-        BitboardUtil::TempGUI::makeSquare(std::array<char, 2>{epCol, epRow});
+    m_st->enPassant = TempGUI::makeSquare(std::array<char, 2>{epCol, epRow});
   }
   if (m_st->enPassant == 0)
   {
@@ -293,11 +293,9 @@ void Position::printPieces(const std::string &fen) const
   std::cout << "Fen: " << fen << "\n";
   std::cout << "Side to move: " << (m_whiteToMove ? "WHITE\n" : "BLACK\n");
   std::cout << "Castling rights: "
-            << BitboardUtil::TempGUI::getCastleRights(m_st->castlingRights,
-                                                      CastlingIndexes)
+            << TempGUI::getCastleRights(m_st->castlingRights, CastlingIndexes)
             << "\n";
-  std::cout << "En passant: "
-            << BitboardUtil::TempGUI::makeSquareNotation(m_st->enPassant)
+  std::cout << "En passant: " << TempGUI::makeSquareNotation(m_st->enPassant)
             << std::endl;
   // GUI::getCheckers(checker, pos.st.checkers);
   // std::cout << "\nHash key: " << pos.st.hashKey << "\nChecker: " << checker

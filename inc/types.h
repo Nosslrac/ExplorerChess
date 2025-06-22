@@ -60,6 +60,15 @@ enum Flags
   PROMO_QC = 0xF0000
 };
 
+enum FlagsV2 : move_t
+{
+  QUIET_ = 0,
+  DOUBLE_JUMP = 2U << 12U,
+  EN_PASSANT = 1U << 14U,
+  CASTLE = 2U << 14U,
+  PROMOTION = 3U << 14U,
+};
+
 enum PieceType : index_t
 {
   ALL_PIECES,
@@ -81,23 +90,6 @@ enum PieceV2 : index_t
   W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN,
   B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN,
   W_KING, B_KING,
-};
-
-struct MoveV2
-{
-public:
-  explicit MoveV2(move_t m) : eval(0), move(m) {}
-  [[nodiscard]] constexpr square_t getTo() const { return move & 0xFFU; }
-  [[nodiscard]] constexpr square_t getFrom() const { return (move >> 8U) & 0xFFU; }
-  [[nodiscard]] constexpr Flags getFlags() const { return static_cast<Flags>(move & 0xFF0000U); }
-  [[nodiscard]] constexpr index_t getPromo() const { return (move >> 16U) & 0x3U; }
-  // [[nodiscard]] constexpr square_t getMover() const { return (move >> 24U) & 0xFU; }
-  // [[nodiscard]] constexpr square_t getCaptured() const { return move >> 28U; }
-  bool operator<(const MoveV2 &other) const { return other.eval < eval; }
-
-private:
-  int eval;
-  uint32_t move;
 };
 
 // clang-format on

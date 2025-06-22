@@ -5,7 +5,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string>
 
 #include "types.h"
 
@@ -179,53 +178,6 @@ constexpr bool isOnBoard(square_t square)
 }
 
 constexpr std::uint8_t fileOf(square_t square) { return square & 7U; }
-
-namespace TempGUI {
-
-inline constexpr square_t makeSquare(const std::array<char, 2> &move)
-{
-  assert(move.size() == 2);
-
-  return square_t(move.at(0) - 'a' + (('8' - move.at(1)) << 3U));
-}
-
-inline std::string getCastleRights(std::uint8_t castleRights,
-                                   std::string_view castleLetters)
-{
-  std::string castle;
-  for (auto i = 0; i < 4; i++)
-  {
-    if (castleRights & BB(i))
-    {
-      castle += castleLetters[i];
-    }
-  }
-  return castle;
-}
-
-inline std::string makeSquareNotation(square_t square)
-{
-  if (!isOnBoard(square) || square == SQ_NONE)
-  {
-    return "-";
-  }
-  return std::string({static_cast<char>('a' + (square & 7U)),
-                      static_cast<char>('8' - (square >> 3U))});
-}
-
-inline std::string makeMoveNotation(MoveV2 move)
-{
-  square_t from = move.getFrom();
-  square_t to = move.getTo();
-  if (!isOnBoard(from) || !isOnBoard(to))
-  {
-    return "(invalid move)";
-  }
-  return makeSquareNotation(from) + makeSquareNotation(to) +
-         " nbrq"[move.getPromo()];
-}
-
-} // namespace TempGUI
 
 constexpr uint8_t castlingModifiers[SQ_COUNT] = {
     0b0111, 0b1111, 0b1111, 0b1111, 0b0011, 0b1111, 0b1111, 0b1011,
