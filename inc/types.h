@@ -19,14 +19,8 @@ enum class Side : std::uint8_t
   BLACK = 1
 };
 
-enum class CastleSide : std::uint8_t
-{
-  KING,
-  QUEEN,
-};
-
 // clang-format off
-enum Square : std::int8_t {
+enum Square : square_t {
     SQ_A8, SQ_B8, SQ_C8, SQ_D8, SQ_E8, SQ_F8, SQ_G8, SQ_H8,
     SQ_A7, SQ_B7, SQ_C7, SQ_D7, SQ_E7, SQ_F7, SQ_G7, SQ_H7,
     SQ_A6, SQ_B6, SQ_C6, SQ_D6, SQ_E6, SQ_F6, SQ_G6, SQ_H6,
@@ -37,7 +31,6 @@ enum Square : std::int8_t {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
     SQ_NONE = 0x7F,
 
-    SQ_ZERO = 0,
     SQ_COUNT   = 64
 };
 // clang-format on
@@ -87,9 +80,8 @@ enum PieceType : index_t
 enum PieceV2 : index_t
 {
   NO_PIECE = 0,
-  W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN,
-  B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN,
-  W_KING, B_KING,
+  W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING,
+  B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN, B_KING,
 };
 
 // clang-format on

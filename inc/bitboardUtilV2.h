@@ -1,5 +1,4 @@
 #pragma once
-#include <array>
 #include <cassert>
 #include <immintrin.h>
 
@@ -20,12 +19,16 @@
 // #define getPromo(move) ((move >> 16U) & 0x3U)
 #define BB(i) (1UL << i)
 
-enum Direction
+enum Direction : std::int8_t
 {
-  UP,
-  DOWN,
-  UP_LEFT,
-  UP_RIGHT
+  NORTH = -8,
+  SOUTH = -NORTH,
+  WEST = -1,
+  EAST = -WEST,
+  NORTH_WEST = -9,
+  NORTH_EAST = -7,
+  SOUTH_WEST = -NORTH_EAST,
+  SOUTH_EAST = -NORTH_WEST,
 };
 
 namespace BitboardUtil {
@@ -54,9 +57,9 @@ constexpr bitboard_t All_SQ = ~0ULL;
 constexpr bitboard_t NOT_EDGE =
     (Rank2 | Rank3 | Rank4 | Rank5 | Rank6 | Rank7) & ~FileA & ~FileH;
 constexpr int CHECK_MATE = -0xFFFF;
-constexpr int BLACK = 1;
-constexpr int WHITE = 0;
-constexpr int BLACK_OFFSET = 5;
+constexpr index_t BLACK = 1;
+constexpr index_t WHITE = 0;
+constexpr int BLACK_OFFSET = 6;
 constexpr int BOARD_DIMMENSION = 8;
 constexpr std::size_t MAX_MOVES = 100;
 
@@ -81,6 +84,86 @@ constexpr bitboard_t BLACK_ATTACK_QUEEN = BLACK_QUEEN_PIECES ^ BB(1U) ^ BB(4U);
 constexpr bitboard_t WHITE_ATTACK_KING = WHITE_KING_PIECES ^ BB(60U);
 constexpr bitboard_t BLACK_ATTACK_KING = BLACK_KING_PIECES ^ BB(4U);
 
+struct Masks final
+{
+  // Castling related
+  bitboard_t CASTLE_KING_PIECES;
+  bitboard_t CASTLE_QUEEN_PIECES;
+  bitboard_t CASTLE_KING_ATTACK_SQUARES;
+  bitboard_t CASTLE_QUEEN_ATTACK_SQUARES;
+  bitboard_t CASTLE_KING_ROOK_FROM_TO;
+  bitboard_t CASTLE_QUEEN_ROOK_FROM_TO;
+  square_t CASTLE_KING_ROOK_SOURCE;
+  square_t CASTLE_KING_ROOK_DEST;
+  square_t CASTLE_QUEEN_ROOK_SOURCE;
+  square_t CASTLE_QUEEN_ROOK_DEST;
+
+  // Directions
+  Direction UP;
+  Direction UP_RIGHT;
+  Direction UP_LEFT;
+  Direction DOWN;
+  Direction DOWN_RIGHT;
+  Direction DOWN_LEFT;
+  Direction LEFT;
+  Direction RIGHT;
+
+  // Side related
+  index_t TEAM;
+  index_t TEAM_OFFSET;
+};
+
+constexpr Masks WHITE_MASKS = {
+    .CASTLE_KING_PIECES = WHITE_KING_PIECES,
+    .CASTLE_QUEEN_PIECES = WHITE_QUEEN_PIECES,
+    .CASTLE_KING_ATTACK_SQUARES = WHITE_ATTACK_KING,
+    .CASTLE_QUEEN_ATTACK_SQUARES = WHITE_ATTACK_QUEEN,
+    .CASTLE_KING_ROOK_FROM_TO = WHITE_KING_ROOK_FROM_TO,
+    .CASTLE_QUEEN_ROOK_FROM_TO = WHITE_QUEEN_ROOK_FROM_TO,
+    .CASTLE_KING_ROOK_SOURCE = 63,
+    .CASTLE_KING_ROOK_DEST = 61,
+    .CASTLE_QUEEN_ROOK_SOURCE = 56,
+    .CASTLE_QUEEN_ROOK_DEST = 59,
+    .UP = NORTH,
+    .UP_RIGHT = NORTH_EAST,
+    .UP_LEFT = NORTH_WEST,
+    .DOWN = SOUTH,
+    .DOWN_RIGHT = SOUTH_EAST,
+    .DOWN_LEFT = SOUTH_WEST,
+    .LEFT = WEST,
+    .RIGHT = EAST,
+    .TEAM = WHITE,
+    .TEAM_OFFSET = 0,
+};
+
+constexpr Masks BLACK_MASKS = {
+    .CASTLE_KING_PIECES = BLACK_KING_PIECES,
+    .CASTLE_QUEEN_PIECES = BLACK_QUEEN_PIECES,
+    .CASTLE_KING_ATTACK_SQUARES = BLACK_ATTACK_KING,
+    .CASTLE_QUEEN_ATTACK_SQUARES = BLACK_ATTACK_QUEEN,
+    .CASTLE_KING_ROOK_FROM_TO = BLACK_KING_ROOK_FROM_TO,
+    .CASTLE_QUEEN_ROOK_FROM_TO = BLACK_QUEEN_ROOK_FROM_TO,
+    .CASTLE_KING_ROOK_SOURCE = 7,
+    .CASTLE_KING_ROOK_DEST = 5,
+    .CASTLE_QUEEN_ROOK_SOURCE = 0,
+    .CASTLE_QUEEN_ROOK_DEST = 3,
+    .UP = SOUTH,
+    .UP_RIGHT = SOUTH_WEST,
+    .UP_LEFT = SOUTH_EAST,
+    .DOWN = NORTH,
+    .DOWN_RIGHT = NORTH_WEST,
+    .DOWN_LEFT = NORTH_EAST,
+    .LEFT = EAST,
+    .RIGHT = WEST,
+    .TEAM = BLACK,
+    .TEAM_OFFSET = BLACK_OFFSET,
+};
+
+template <Side s> inline constexpr const Masks *bitboardMasks()
+{
+  return s == Side::WHITE ? &WHITE_MASKS : &BLACK_MASKS;
+}
+
 inline int pext(bitboard_t BB, bitboard_t mask)
 {
 #ifdef PEXT
@@ -90,46 +173,24 @@ inline int pext(bitboard_t BB, bitboard_t mask)
 #endif
 }
 
-inline uint8_t bitCount(bitboard_t BB)
+inline index_t bitCount(bitboard_t BB)
 {
 #if __has_builtin(__builtin_popcountll)
-  return static_cast<uint8_t>(__builtin_popcountll(BB));
+  return static_cast<index_t>(__builtin_popcountll(BB));
 #else
   return 0; // Impl needed
 #endif
 }
 
-inline uint8_t bitScan(bitboard_t BB)
+inline index_t bitScan(bitboard_t BB)
 {
 #if __has_builtin(__builtin_ctzll)
-  return static_cast<uint8_t>(__builtin_ctzll(BB));
+  return static_cast<index_t>(__builtin_ctzll(BB));
 #else
   return 0; // Impl needed
 #endif
 }
 
-template <PieceV2 p> inline bitboard_t pieces(const bitboard_t pieces[])
-{
-  return pieces[p] | pieces[BLACK + p];
-}
-
-template <bool whiteToMove, Direction D> bitboard_t shift(bitboard_t b)
-{
-  if constexpr (whiteToMove)
-  {
-    return D == UP        ? b >> 8
-           : D == DOWN    ? b << 8
-           : D == UP_LEFT ? (b >> 9) & ~FileH
-                          : (b >> 7) & ~FileA;
-  }
-  if constexpr (!whiteToMove)
-  {
-    return D == UP        ? b << 8
-           : D == DOWN    ? b >> 8
-           : D == UP_LEFT ? (b << 7) & ~FileH
-                          : (b << 9) & ~FileA;
-  }
-}
 // Squares infront of pawn
 template <bool white> inline bitboard_t forwardSquares(square_t sq)
 {
@@ -170,16 +231,16 @@ template <bool white, bool kingSide> bool isAttacked(bitboard_t attack)
   }
 }
 
-inline bool moreThanOne(bitboard_t b) { return b & (b - 1); }
+inline constexpr bool moreThanOne(const bitboard_t b) { return b & (b - 1); }
 
-constexpr bool isOnBoard(square_t square)
+inline constexpr bool isOnBoard(square_t square)
 {
   return square >= SQ_A8 && square <= SQ_H1;
 }
 
-constexpr std::uint8_t fileOf(square_t square) { return square & 7U; }
+constexpr index_t fileOf(square_t square) { return square & 7U; }
 
-constexpr uint8_t castlingModifiers[SQ_COUNT] = {
+constexpr std::uint8_t castlingModifiers[SQ_COUNT] = {
     0b0111, 0b1111, 0b1111, 0b1111, 0b0011, 0b1111, 0b1111, 0b1011,
     0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111,
     0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111,

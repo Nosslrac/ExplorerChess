@@ -18,7 +18,7 @@ template void Position::undoMove<Side::WHITE>(Move);
 template void Position::undoMove<Side::BLACK>(Move);
 
 namespace {
-constexpr std::string_view PieceIndexes(" PNBRQpnbrqKk");
+constexpr std::string_view PieceIndexes(" PNBRQKpnbrqk");
 constexpr std::string_view CastlingIndexes("KQkq");
 } // namespace
 
@@ -48,7 +48,8 @@ void Position::undoMove(Move move)
 
 template <Side s> void Position::doMove(Move move, StateInfo &newSt)
 {
-
+  static_assert(std::is_trivially_copyable_v<StateInfo>,
+                "Memcpy cannot be performed safely");
   std::memcpy(
       &newSt, m_st,
       __builtin_offsetof(StateInfo,
@@ -57,8 +58,6 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   newSt.prevSt = m_st;
   m_st = &newSt;
 
-  // bitboard_t newHash = pos.st.hashKey ^ m_zobristHash.whiteToMoveHash;
-
   // Get move info
   const square_t from = move.getFrom();
   const square_t to = move.getTo();
@@ -66,95 +65,89 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   const bitboard_t toBB = BB(to);
 
   const PieceV2 mover = m_board[from];
-  const uint32_t flags = move.getFlags();
+  const FlagsV2 flags = move.getFlags();
 
-  constexpr index_t team = s == Side::WHITE ? 0 : 1;
-  constexpr uint8_t enemy = s == Side::WHITE ? 1 : 0;
+  constexpr auto team = static_cast<index_t>(s);
+  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
 
-  // const bitboard_t teamBoard = m_teamBoards[team];
+  constexpr const BitboardUtil::Masks *masks = BitboardUtil::bitboardMasks<s>();
 
   m_teamBoards[team] ^= fromBB ^ toBB;
-  // Increment position value based on prev move
-  // pos.st.materialScore +=
-  //     scoreFavor * m_evaluation.pieceScoreChange(from, to, mover);
+  m_board[to] = mover; // Will be overwritten if we have a promotion
 
-  // Remove old ep hash if there was one
-  if (m_st->enPassant != 0)
+  // Remove ep possiblity
+  if (m_st->enPassant != SQ_NONE)
   {
-    // newHash ^= m_zobristHash.epHash[pos.st.enPassant & 7]; // File ep hash
-    m_st->enPassant = 0;
+    m_st->enPassant = SQ_NONE;
   }
 
-  // TODO: fix this to fetch from 8x8 board
-  const PieceType movingType = PieceType::PAWN;
+  /// TODO: Maybe only use PieceType
+  const auto movingType =
+      static_cast<PieceType>(m_board[from] - masks->TEAM_OFFSET);
+  constexpr index_t capturedOffset =
+      s == Side::WHITE ? BitboardUtil::BLACK_OFFSET : 0;
+  assert(movingType >= PAWN && movingType <= KING);
 
   if (movingType == PieceType::KING)
   {
-    m_kings[static_cast<std::uint8_t>(s)] = to;
-    if (flags == CASTLE_KING)
-    {
-      doCastle<s>(CastleSide::KING);
-      // TODO: update zobrist hash
-    }
-    else if (flags == CASTLE_QUEEN)
-    {
-      doCastle<s>(CastleSide::QUEEN);
-      // TODO: update zobrist hash
-    }
+    m_kings[team] = to;
   }
   else
   {
     m_pieceBoards[movingType] ^= fromBB ^ toBB;
   }
 
-  if (flags == CAPTURE)
+  if (flags == QUIET_ || flags == DOUBLE_JUMP)
   {
-    // m_board will be overwritten later when moving the piece
-    constexpr index_t capturedOffset =
-        s == Side::WHITE ? BitboardUtil::BLACK_OFFSET : 0;
     const PieceV2 captured = m_board[to];
-    m_pieceBoards[captured - capturedOffset] ^= toBB;
-    m_teamBoards[enemy] ^= toBB;
+    if (captured != NO_PIECE)
+    {
+      m_st->capturedPiece = captured;
+      m_pieceBoards[captured - capturedOffset] ^= toBB;
+      m_teamBoards[team ^ 1U] ^= toBB;
+    }
+    m_st->enPassant = flags == DOUBLE_JUMP && hasPawnsOnEpRank<enemy>()
+                          ? static_cast<square_t>(to + masks->UP)
+                          : SQ_NONE;
   }
-
-  if (movingType == PieceType::PAWN)
+  else if (flags == CASTLE)
   {
-    constexpr char add = s == Side::WHITE ? 8 : -8;
-    if (flags == QUIET)
+    /// TODO: Decide if m_board should only store PieceType instead
+    if (toBB & masks->CASTLE_KING_PIECES)
     {
-      // DO nothing
+      m_pieceBoards[ROOK] ^= masks->CASTLE_KING_ROOK_FROM_TO;
+      m_board[masks->CASTLE_KING_ROOK_SOURCE] = NO_PIECE;
+      m_board[masks->CASTLE_KING_ROOK_DEST] = static_cast<PieceV2>(
+          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
     }
-    else if (flags == EP_CAPTURE)
+    else
     {
-      m_pieceBoards[PAWN] ^= BB((to + add));
-      m_teamBoards[enemy] ^= BB((to + add));
-      // newHash ^=
-      //     m_zobristHash.pieceHash[enemyPawn][to + add]; // Remove pawn from
-      //     hash
-      // pos.st.materialValue +=
-      //     scoreFavor * m_evaluation.getPieceValue(captured + blackOffset);
+      m_pieceBoards[ROOK] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
+      m_board[masks->CASTLE_QUEEN_ROOK_SOURCE] = NO_PIECE;
+      m_board[masks->CASTLE_QUEEN_ROOK_DEST] = static_cast<PieceV2>(
+          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
     }
-    else if (flags == DOUBLE_PUSH && hasPawnsOnEpRank<s>())
-    {
-      m_st->enPassant = static_cast<square_t>(to + add);
-      // newHash ^= m_zobristHash.epHash[(to + add) & 7]; // Add new ep hash
-    }
-    else // Promotion
-    {
-      m_pieceBoards[PAWN] ^= toBB;
-      m_pieceBoards[1 + move.getPromo()] |= toBB;
-      // TODO: fix zobrist hash and material
+  }
+  else if (flags == EN_PASSANT)
+  {
+    const bitboard_t enemyPawnBB =
+        (s == Side::WHITE ? toBB << static_cast<index_t>(SOUTH)
+                          : toBB >> static_cast<index_t>(SOUTH));
+    m_pieceBoards[PAWN] ^= enemyPawnBB;
+    m_teamBoards[team ^ 1U] ^= enemyPawnBB;
+    m_board[to + masks->DOWN] = NO_PIECE;
+  }
+  else if (flags == PROMOTION)
+  {
+    m_pieceBoards[PAWN] ^= toBB; // Remove pawn again
+    m_pieceBoards[KNIGHT + move.getPromo()] |= toBB;
 
-      if (flags & CAPTURE)
-      {
-        // m_board will be overwritten later when moving the piece
-        constexpr index_t capturedOffset =
-            s == Side::WHITE ? BitboardUtil::BLACK_OFFSET : 0;
-        const PieceV2 captured = m_board[to];
-        m_pieceBoards[captured - capturedOffset] ^= toBB;
-        m_teamBoards[enemy] ^= toBB;
-        // Fix zobrist and material value
-      }
+    const PieceV2 captured = m_board[to];
+    if (captured != NO_PIECE)
+    {
+      m_st->capturedPiece = captured;
+      m_pieceBoards[captured - capturedOffset] ^= toBB;
+      m_teamBoards[team ^ 1U] ^= toBB;
     }
   }
 
@@ -165,39 +158,94 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   m_pieceBoards[ALL_PIECES] =
       m_teamBoards[BitboardUtil::WHITE] | m_teamBoards[BitboardUtil::BLACK];
   m_board[from] = NO_PIECE;
-  m_board[to] = mover;
 
   m_whiteToMove = !m_whiteToMove;
   // newHash ^= pos.ply * m_zobristHash.moveHash;
 
   m_ply++;
 
-  // // newHash ^= pos.ply * m_zobristHash.moveHash;
+  // newHash ^= pos.ply * m_zobristHash.moveHash;
 
-  // // pos.st.hashKey = newHash;
-
-  m_st->enemyAttack =
-      0; // Find attacks: m_moveGen.findAttack<!whiteToMove>(pos);
-  // TODO: update attacks and pins the correct way with new movegen
-  // m_moveGen.pinnedBoard<!whiteToMove>(pos);
-  // m_moveGen.checks<!whiteToMove>(pos);
-  // m_moveGen.setCheckSquares<!whiteToMove>(pos);
+  // pos.st.hashKey = newHash;
 }
 
 template <Side s> void Position::undoMove(Move move)
 {
+  m_st = m_st->prevSt; // Reset state
+
   const square_t from = move.getFrom();
   const square_t to = move.getTo();
-  const bitboard_t fromToBB = BB(from) | BB(to);
+  const FlagsV2 flags = move.getFlags();
+  const bitboard_t fromBB = BB(from);
+  const bitboard_t toBB = BB(to);
+  const PieceV2 mover = m_board[to];
+  const PieceV2 captured = m_st->capturedPiece;
 
-  constexpr uint8_t team = s == Side::WHITE ? 0 : 1;
+  constexpr auto team = static_cast<index_t>(s);
 
-  m_teamBoards[team] ^= fromToBB;
+  constexpr const BitboardUtil::Masks *masks = BitboardUtil::bitboardMasks<s>();
+
+  m_teamBoards[team] ^= fromBB ^ toBB;
+  m_board[from] = mover;
+  m_board[to] = NO_PIECE; // Will be overwritten if we have a capture
+
+  const auto movingType =
+      static_cast<PieceType>(m_board[from] - masks->TEAM_OFFSET);
+  constexpr index_t capturedOffset =
+      s == Side::WHITE ? BitboardUtil::BLACK_OFFSET : 0;
+  assert(movingType >= PAWN && movingType <= KING);
+  if (movingType == PieceType::KING)
+  {
+    m_kings[team] = from;
+  }
+  else
+  {
+    m_pieceBoards[movingType] ^= fromBB ^ toBB;
+  }
+
+  if (flags == QUIET_ || flags == DOUBLE_JUMP)
+  {}
+  else if (flags == CASTLE)
+  {
+    /// TODO: Decide if m_board should only store PieceType instead
+    if (toBB & masks->CASTLE_KING_PIECES)
+    {
+      m_pieceBoards[ROOK] ^= masks->CASTLE_KING_ROOK_FROM_TO;
+      m_board[masks->CASTLE_KING_ROOK_SOURCE] = static_cast<PieceV2>(
+          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
+      m_board[masks->CASTLE_KING_ROOK_DEST] = NO_PIECE;
+    }
+    else
+    {
+      m_pieceBoards[ROOK] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
+      m_board[masks->CASTLE_QUEEN_ROOK_SOURCE] = static_cast<PieceV2>(
+          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
+      m_board[masks->CASTLE_QUEEN_ROOK_DEST] = NO_PIECE;
+    }
+  }
+  else if (flags == EN_PASSANT)
+  {
+    constexpr auto pawnType = static_cast<PieceV2>(W_PAWN + capturedOffset);
+    m_pieceBoards[PAWN] ^= BB(m_st->enPassant);
+    m_teamBoards[team ^ 1U] ^= BB(m_st->enPassant);
+    m_board[to + masks->DOWN] = pawnType;
+  }
+  else
+  {                                                  // Promotion
+    m_pieceBoards[KNIGHT + move.getPromo()] ^= toBB; // Remove promotion piece
+  }
+
+  if (m_st->capturedPiece != NO_PIECE)
+  {
+    const auto pieceType = static_cast<PieceType>(captured - capturedOffset);
+    m_board[to] = m_st->capturedPiece;
+    m_teamBoards[team ^ 1U] ^= toBB;
+    m_pieceBoards[pieceType] ^= toBB;
+  }
 }
 
 bitboard_t Position::attackOn(square_t square, bitboard_t board) const
 {
-  PseudoAttacks::print_bit_board(pieces<KING>());
   return (MoveGen::attacks<Side::WHITE, PAWN>(0, square) &
           pieces<Side::BLACK, PAWN>()) |
          (MoveGen::attacks<Side::BLACK, PAWN>(0, square) &
@@ -206,6 +254,29 @@ bitboard_t Position::attackOn(square_t square, bitboard_t board) const
          (MoveGen::attacks<BISHOP>(board, square) & pieces<BISHOP, QUEEN>()) |
          (MoveGen::attacks<KNIGHT>(0, square) & pieces<KNIGHT>()) |
          (MoveGen::attacks<KING>(0, square) & pieces<KING>());
+}
+
+void Position::placePiece(PieceV2 piece, square_t square)
+{
+  assert(piece >= W_PAWN && piece <= B_KING);
+  assert(BitboardUtil::isOnBoard(square));
+  m_board[square] = piece;
+  if (piece < B_PAWN)
+  {
+    m_teamBoards[BitboardUtil::WHITE] |= BB(square);
+    m_pieceBoards[piece] |= BB(square);
+  }
+  else if (piece <= B_QUEEN)
+  {
+    m_teamBoards[BitboardUtil::BLACK] |= BB(square);
+    m_pieceBoards[piece - BitboardUtil::BLACK_OFFSET] |= BB(square);
+  }
+  else
+  {
+    m_teamBoards[piece - W_KING] |= BB(square);
+    m_kings[piece - W_KING] = square;
+  }
+  m_pieceBoards[ALL_PIECES] |= BB(square);
 }
 
 /// @brief: Initialize the position according to the fen string
@@ -231,8 +302,7 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
       square += (token - '0');
     }
     else if (token == '/')
-    {
-    }
+    {}
     else if ((id = PieceIndexes.find(token)) != std::string::npos)
     {
       placePiece(PieceV2(id), square);

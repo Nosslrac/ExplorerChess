@@ -8,19 +8,23 @@
 struct StateInfo final
 {
   // Copied when making a move
-  uint8_t castlingRights;
+  std::uint8_t castlingRights;
   square_t enPassant;
+  PieceV2 capturedPiece;
   score_t materialScore;
   score_t materialValue;
 
   // Recomputed during doMove
   bitboard_t blockForKing;
   bitboard_t pinnedMask;
-  bitboard_t enemyAttack;
   bitboard_t checkers;
 
   bitboard_t hashKey;
   StateInfo *prevSt;
+
+  constexpr StateInfo()
+      : castlingRights(0), enPassant(SQ_NONE), capturedPiece(NO_PIECE)
+  {}
 };
 
 // Inherits irreversible info from StateInfo
@@ -36,13 +40,19 @@ public:
   void undoMove(Move move);
 
   // Fetching pieceBoards and teamBoards (don't use with KING)
-  constexpr bitboard_t pieces(Side s) const;
+  template <Side s> constexpr bitboard_t pieces_s() const;
   template <PieceType... pts> constexpr bitboard_t pieces() const;
   template <Side s, PieceType... pts> constexpr bitboard_t pieces() const;
+  template <Side s> constexpr square_t kingSquare() const;
 
   bitboard_t attackOn(square_t square, bitboard_t board) const;
+  template <Side s>
+  constexpr bool isSafeSquares(bitboard_t squaresToCheck,
+                               bitboard_t board) const;
 
   template <Side s> bool hasPawnsOnEpRank() const;
+  bool isWhiteToMove() const;
+  template <Side s> constexpr std::uint8_t castleRights() const;
 
   Position(const Position &) = delete;
   Position &operator=(const Position &) = delete;
@@ -56,7 +66,6 @@ private:
   template <Side s> void undoMove(Move move);
 
   // Small inline methods
-  template <Side s> void doCastle(CastleSide castleSide);
   template <Side s> bitboard_t EPpawns() const;
 
   //////////////////
@@ -86,12 +95,17 @@ template <Side s> inline bitboard_t Position::EPpawns() const
               : (BitboardUtil::Rank5 & m_teamBoards[BitboardUtil::BLACK]));
 }
 
+template <Side s> constexpr square_t Position::kingSquare() const
+{
+  return m_kings[static_cast<index_t>(s)];
+}
+
 template <> inline constexpr bitboard_t Position::pieces<KING>() const
 {
   return BB(m_kings[0]) | BB(m_kings[1]);
 }
 
-inline constexpr bitboard_t Position::pieces(Side s) const
+template <Side s> inline constexpr bitboard_t Position::pieces_s() const
 {
   return m_teamBoards[static_cast<std::uint8_t>(s)];
 }
@@ -104,7 +118,7 @@ template <PieceType... pts> inline constexpr bitboard_t Position::pieces() const
 template <Side s, PieceType... pts>
 inline constexpr bitboard_t Position::pieces() const
 {
-  return pieces(s) & pieces<pts...>();
+  return pieces_s<s>() & pieces<pts...>();
 }
 
 template <Side s> inline bool Position::hasPawnsOnEpRank() const
@@ -112,42 +126,23 @@ template <Side s> inline bool Position::hasPawnsOnEpRank() const
   return EPpawns<s>() != 0;
 }
 
-/// @note: Does not work for chess960
-template <Side s> inline void Position::doCastle(CastleSide castleSide)
+template <Side s> inline constexpr std::uint8_t Position::castleRights() const
 {
-  constexpr int side =
-      s == Side::WHITE ? BitboardUtil::WHITE : BitboardUtil::BLACK;
-  constexpr bitboard_t kingCastle = s == Side::WHITE
-                                        ? BitboardUtil::WHITE_KING_ROOK_FROM_TO
-                                        : BitboardUtil::BLACK_KING_ROOK_FROM_TO;
-  constexpr bitboard_t queenCastle =
-      s == Side::WHITE ? BitboardUtil::WHITE_QUEEN_ROOK_FROM_TO
-                       : BitboardUtil::BLACK_QUEEN_ROOK_FROM_TO;
-
-  const bitboard_t rookFromTo =
-      castleSide == CastleSide::KING ? kingCastle : queenCastle;
-  m_pieceBoards[ROOK] ^= rookFromTo;
-  m_teamBoards[side] ^= rookFromTo;
+  return s == Side::WHITE ? m_st->castlingRights : m_st->castlingRights >> 2U;
 }
 
-inline void Position::placePiece(PieceV2 piece, square_t square)
+template <Side s>
+constexpr bool Position::isSafeSquares(bitboard_t squaresToCheck,
+                                       bitboard_t board) const
 {
-  assert(piece >= W_PAWN && piece <= B_KING);
-  assert(BitboardUtil::isOnBoard(square));
-  m_board[square] = piece;
-  if (piece < B_PAWN)
+  for (; squaresToCheck != 0; squaresToCheck &= squaresToCheck - 1)
   {
-    m_teamBoards[BitboardUtil::WHITE] |= BB(square);
-    m_pieceBoards[piece] |= BB(square);
+    if (attackOn(BitboardUtil::bitScan(squaresToCheck), board))
+    {
+      return false;
+    }
   }
-  else if (piece <= B_QUEEN)
-  {
-    m_teamBoards[BitboardUtil::BLACK] |= BB(square);
-    m_pieceBoards[piece - BitboardUtil::BLACK_OFFSET] |= BB(square);
-  }
-  else
-  {
-    m_kings[piece - W_KING] = square;
-  }
-  m_pieceBoards[ALL_PIECES] |= BB(square);
+  return true;
 }
+
+inline bool Position::isWhiteToMove() const { return m_whiteToMove; }

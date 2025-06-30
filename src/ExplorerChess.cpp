@@ -11,9 +11,14 @@ int main()
   ATTACKS::init();
   Position pos{};
   StateInfo st{};
-  pos.fenInit("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e3 0 1", st);
-  auto attackers = pos.attackOn(53, pos.pieces<ALL_PIECES>());
-  PseudoAttacks::print_bit_board(attackers);
+
+  pos.fenInit("4k3/4b3/8/r7/8/4B3/2R5/4K3 b - - 0 1", st);
+  // pos.fenInit("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq e3 0 1",
+  // st);
+  // auto attackers = pos.attackOn(53, pos.pieces<ALL_PIECES>());
+  // PseudoAttacks::print_bit_board(attackers);
+
+  Perft::perft(pos, 2);
   // for (int i = 0; i < 64; i++)
   // {
   //   if (i % 3 == 0)

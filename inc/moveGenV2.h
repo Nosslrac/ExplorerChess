@@ -9,6 +9,7 @@
 #include "attacks.h"
 #endif
 
+#include <array>
 #include <string>
 
 // clang-format off
@@ -21,22 +22,23 @@
 class Move final
 {
 public:
+  constexpr explicit Move() : move(0) {}
   constexpr explicit Move(move_t m) : move(m) {}
-  [[nodiscard]] constexpr square_t getTo() const { return move & 0x3FU; }
-  [[nodiscard]] constexpr square_t getFrom() const { return (move >> 6U) & 0x3FU; }
+  [[nodiscard]] constexpr Square getTo() const { return Square(move & 0x3FU); }
+  [[nodiscard]] constexpr Square getFrom() const { return Square((move >> 6U) & 0x3FU); }
   [[nodiscard]] constexpr bool isDoubleJump() const { return (move >> 12U) == 2; }
   [[nodiscard]] constexpr bool isPromo() const { return (move >> 14U) == 3; }
   [[nodiscard]] constexpr FlagsV2 getFlags() const { return static_cast<FlagsV2>(move & 0xC000U); }
-  [[nodiscard]] constexpr square_t getPromo() const { return (move >> 12U) & 0x3U; }
+  [[nodiscard]] constexpr index_t getPromo() const { return (move >> 12U) & 0x3U; }
 
 
   static constexpr Move make(square_t from, square_t to) {
-    return Move(move_t(from | (to << 6U)));
+    return Move(move_t(to | (from << 6U)));
   }
 
   template<FlagsV2 flags>
   static constexpr Move make(square_t from, square_t to, PieceType pt = KNIGHT) {
-    return Move(move_t(from | (to << 6U) | (pt - KNIGHT) << 12U | flags));
+    return Move(move_t(to | (from << 6U) | (pt - KNIGHT) << 12U | flags));
   }
 
 private:
@@ -46,6 +48,7 @@ private:
 
 enum class MoveFilter : std::uint8_t
 {
+  ALL,
   QUIETS,
   CAPTURES,
   CHECK_EVASIONS
@@ -56,9 +59,9 @@ class Position;
 namespace MoveGen {
 /// @brief Generate the possible moves
 template <MoveFilter filter>
-index_t generate(const Position &pos, Move *moveList);
+Move *generate(const Position &pos, Move *moveList);
 template <MoveFilter filter, Side s>
-index_t generate(const Position &pos, Move *moveList);
+Move *generate(const Position &pos, Move *moveList);
 
 /// @brief Gives the attack bitboard for a piece given
 /// the occupancy and start square
@@ -70,16 +73,22 @@ bitboard_t attacks(bitboard_t occupancy, square_t square);
 template <MoveFilter filter, Side... s> struct MoveList final
 {
   explicit MoveList(const Position &pos)
-      : last(generate<filter, s...>(pos, moves)) {};
-  constexpr void add(move_t move) { moves[last++] = Move(move); }
-  constexpr index_t size() const { return last; }
+      : last(generate<filter, s...>(pos, moves)){};
+  constexpr void add(move_t move) { *last++ = Move(move); }
+  const Move *begin() const { return moves; }
+  const Move *end() const { return last; }
+  constexpr index_t size() const { return last - moves; }
 
 private:
-  Move moves[100];
-  index_t last;
+  Move moves[BitboardUtil::MAX_MOVES];
+  Move *last;
 };
 
 } // namespace MoveGen
+
+namespace Perft {
+void perft(Position &pos, int depth);
+}
 
 namespace PseudoAttacks {
 constexpr bitboard_t KnightAttacks[SQ_COUNT] = {
