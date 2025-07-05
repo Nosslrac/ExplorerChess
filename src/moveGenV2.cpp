@@ -60,6 +60,148 @@ Move *generatePieceMoves(const Position &pos, Move *moveList,
   return moveList;
 }
 
+template <Side s, MoveFilter filter>
+Move *generatePawnMoves(const Position &pos, Move *moveList,
+                        const bitboard_t targetSQs,
+                        const bitboard_t pinnedPieces)
+{
+  // Useful constants
+  constexpr auto masks = BitboardUtil::bitboardMasks<s>();
+  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
+  const bitboard_t pawns = pos.pieces<s, PAWN>();
+  const bitboard_t pinnedPawns = pawns & pinnedPieces;
+  const bitboard_t nonPinnedPawms = pawns & ~pinnedPieces;
+  const bitboard_t allPieces = pos.pieces<ALL_PIECES>();
+  const bitboard_t enemyPieces = pos.pieces_s<enemy>();
+
+  // Generate captures
+  if constexpr (filter != MoveFilter::QUIETS)
+  {
+    // Generate legal non pinned capture moves
+    const bitboard_t nonPinnedCaptureRight =
+        BitboardUtil::shift<masks->UP_RIGHT>(nonPinnedPawms &
+                                             masks->NOT_RIGHT_COL) &
+        enemyPieces & targetSQs;
+    const bitboard_t nonPinnedCaptureLeft =
+        BitboardUtil::shift<masks->UP_LEFT>(nonPinnedPawms &
+                                            masks->NOT_LEFT_COL) &
+        enemyPieces & targetSQs;
+
+    for (bitboard_t captureRight = nonPinnedCaptureRight; captureRight != 0;
+         captureRight &= captureRight - 1)
+    {
+      const square_t square = BitboardUtil::bitScan(captureRight);
+      *moveList++ = Move::make(square + masks->DOWN_LEFT, square);
+    }
+
+    for (bitboard_t captureLeft = nonPinnedCaptureLeft; captureLeft != 0;
+         captureLeft &= captureLeft - 1)
+    {
+      const square_t square = BitboardUtil::bitScan(captureLeft);
+      *moveList++ = Move::make(square + masks->DOWN_RIGHT, square);
+    }
+
+    // Generate legal captures for pinned pawns
+    if (pinnedPawns)
+    {
+      // Generate legal non pinned capture moves
+      const bitboard_t pinnedCaptureRight =
+          BitboardUtil::shift<masks->UP_RIGHT>(pinnedPawns &
+                                               masks->NOT_RIGHT_COL) &
+          enemyPieces & targetSQs;
+      const bitboard_t pinnedCaptureLeft =
+          BitboardUtil::shift<masks->UP_LEFT>(pinnedPawns &
+                                              masks->NOT_LEFT_COL) &
+          enemyPieces & targetSQs;
+      const square_t kingSquare = pos.kingSquare<s>();
+
+      for (bitboard_t captureRight = pinnedCaptureRight; captureRight != 0;
+           captureRight &= captureRight - 1)
+      {
+        const square_t square = BitboardUtil::bitScan(captureRight);
+        const square_t from = square + masks->DOWN_LEFT;
+        if (RayConstants::RayBB[from][kingSquare] & BB(square))
+        {
+          *moveList++ = Move::make(from, square);
+        }
+      }
+
+      for (bitboard_t captureLeft = pinnedCaptureLeft; captureLeft != 0;
+           captureLeft &= captureLeft - 1)
+      {
+        const square_t square = BitboardUtil::bitScan(captureLeft);
+        const square_t from = square + masks->DOWN_RIGHT;
+        if (RayConstants::RayBB[from][kingSquare] & BB(square))
+        {
+          *moveList++ = Move::make(from, square);
+        }
+      }
+    }
+  }
+
+  if constexpr (filter == MoveFilter::CAPTURES)
+  {
+    return moveList;
+  }
+
+  // Generate one step pushes and double pushes
+  // All legal single push moves
+  const bitboard_t singlePush =
+      BitboardUtil::shift<masks->UP>(nonPinnedPawms) & ~allPieces & targetSQs;
+  // All legal double push moves
+  const bitboard_t doublePush =
+      BitboardUtil::shift<masks->UP>(singlePush) & ~allPieces & targetSQs;
+
+  for (bitboard_t squares = singlePush; squares != 0; squares &= squares - 1)
+  {
+    const square_t square = BitboardUtil::bitScan(squares);
+    *moveList++ = Move::make(square + masks->DOWN, square);
+  }
+
+  for (bitboard_t squares = doublePush; squares != 0; squares &= squares - 1)
+  {
+    const square_t square = BitboardUtil::bitScan(squares);
+    *moveList++ = Move::make(square + masks->DOWN + masks->DOWN, square);
+  }
+
+  if (pinnedPawns)
+  {
+    // Generate one step pushes and double pushes for pinned pawns
+    // Pseudo legal single pawn pushes (pawn might be pinned)
+    const bitboard_t pinnedSinglePush =
+        BitboardUtil::shift<masks->UP>(pinnedPawns) & ~allPieces & targetSQs;
+    // Pseudo legal double pushes (pawn might be pinned)
+    const bitboard_t pinnedDoublePush =
+        BitboardUtil::shift<masks->UP>(pinnedSinglePush) & ~allPieces &
+        targetSQs;
+    const square_t kingSquare = pos.kingSquare<s>();
+
+    for (bitboard_t squares = pinnedSinglePush; squares != 0;
+         squares &= squares - 1)
+    {
+      const square_t square = BitboardUtil::bitScan(squares);
+      const square_t from = square + masks->DOWN;
+      if (RayConstants::RayBB[from][kingSquare] & BB(square))
+      {
+        *moveList++ = Move::make(square + masks->DOWN, square);
+      }
+    }
+
+    for (bitboard_t squares = pinnedDoublePush; squares != 0;
+         squares &= squares - 1)
+    {
+      const square_t square = BitboardUtil::bitScan(squares);
+      const square_t from = square + masks->DOWN;
+      if (RayConstants::RayBB[from][kingSquare] & BB(square))
+      {
+        *moveList++ = Move::make(square + masks->DOWN + masks->DOWN, square);
+      }
+    }
+  }
+
+  return moveList;
+}
+
 } // namespace
 
 namespace MoveGen {
@@ -93,13 +235,14 @@ Move *generate(const Position &pos, Move *moveList)
       partialFilter & ~friendlyPieces; // Can't capture own pieces
 
   const square_t kingSquare = pos.kingSquare<s>();
-  const bitboard_t checkBoard = pos.attackOn(kingSquare, allPieces);
-  /// TODO: Get the actually pinned pieces
-  const bitboard_t pinned = 0UL;
+  const bitboard_t checkBoard =
+      pos.attackOn(kingSquare, allPieces) & enemyPieces;
 
   if (!BitboardUtil::moreThanOne(checkBoard))
   {
-    PseudoAttacks::print_bit_board(targetSQs);
+    /// TODO: Get the actually pinned pieces
+    const bitboard_t pinned = 0;
+    moveList = generatePawnMoves<s, filter>(pos, moveList, targetSQs, pinned);
     moveList = generatePieceMoves<s, KNIGHT>(pos, moveList, targetSQs, pinned);
     moveList = generatePieceMoves<s, BISHOP>(pos, moveList, targetSQs, pinned);
     moveList = generatePieceMoves<s, ROOK>(pos, moveList, targetSQs, pinned);
@@ -118,7 +261,7 @@ Move *generate(const Position &pos, Move *moveList)
       *moveList++ = Move::make(kingSquare, square);
     }
   }
-  if (filter != MoveFilter::CAPTURES || checkBoard)
+  if (filter == MoveFilter::CAPTURES || checkBoard)
   {
     return moveList;
   }
@@ -193,27 +336,33 @@ template bitboard_t attacks<Side::BLACK, PAWN>(const bitboard_t,
 
 template <Side s> std::uint64_t bulkCount(Position &pos, int depth)
 {
-  MoveGen::MoveList<MoveFilter::ALL, s> moveList(pos);
+  const MoveGen::MoveList<MoveFilter::ALL, s> moveList(pos);
   if (depth == 1)
   {
     return moveList.size();
   }
   // StateInfo newSt;
   std::uint64_t count = 0;
-  std::cout << "Starting bulk count:" << int(moveList.size()) << "\n";
+  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
 
   for (const auto &move : moveList)
   {
-    count++;
-    std::cout << TempGUI::makeMoveNotation(move) << "\n";
+    StateInfo newState;
+    pos.doMove<s>(move, newState);
+    auto part = bulkCount<enemy>(pos, depth - 1);
+    count += part;
+    pos.undoMove<enemy>(move);
+    std::cout << TempGUI::makeMoveNotation(move) << ": " << part << "\n";
   }
   return count;
 }
 
 void Perft::perft(Position &pos, int depth)
 {
-  pos.isWhiteToMove() ? bulkCount<Side::WHITE>(pos, depth)
-                      : bulkCount<Side::BLACK>(pos, depth);
+  auto count = pos.isWhiteToMove() ? bulkCount<Side::WHITE>(pos, depth)
+                                   : bulkCount<Side::BLACK>(pos, depth);
+
+  std::cout << "Total nodes visited: " << count << "\n";
 }
 
 void PseudoAttacks::print_bit_board(bitboard_t b)
@@ -234,4 +383,74 @@ void PseudoAttacks::print_bit_board(bitboard_t b)
     stb = "";
   }
   std::cout << "--------------------\n\n";
+}
+
+void PseudoAttacks::printMove(Move move)
+{
+  const auto from = move.getFrom();
+  const auto to = move.getTo();
+
+  char rank = '8';
+  std::string stb;
+  stb += "\n +---+---+---+---+---+---+---+---+\n";
+  for (int i = 0; i < BitboardUtil::BOARD_DIMMENSION; i++)
+  {
+    for (int j = 0; j < BitboardUtil::BOARD_DIMMENSION; j++)
+    {
+      auto square = i * BitboardUtil::BOARD_DIMMENSION + j;
+      stb += " | ";
+      stb += square == from ? '&' : square == to ? 'x' : ' ';
+    }
+    stb += " | ";
+    stb += rank;
+    rank--;
+    std::cout << stb;
+    std::cout << "\n +---+---+---+---+---+---+---+---+\n";
+    stb = "";
+  }
+}
+
+void PseudoAttacks::printMoves(square_t from, bitboard_t toSQs)
+{
+  if (toSQs == 0)
+  {
+    return;
+  }
+  char rank = '8';
+  std::string stb;
+  stb += "\n +---+---+---+---+---+---+---+---+\n";
+  for (int i = 0; i < BitboardUtil::BOARD_DIMMENSION; i++)
+  {
+    for (int j = 0; j < BitboardUtil::BOARD_DIMMENSION; j++)
+    {
+      auto square = i * BitboardUtil::BOARD_DIMMENSION + j;
+      stb += " | ";
+      stb += square == from ? '&' : BB(square) & toSQs ? 'x' : ' ';
+    }
+    stb += " | ";
+    stb += rank;
+    rank--;
+    std::cout << stb;
+    std::cout << "\n +---+---+---+---+---+---+---+---+\n";
+    stb = "";
+  }
+}
+
+void PseudoAttacks::printMovelistMoves(Move *move)
+{
+  bitboard_t toSQs[SQ_COUNT]{};
+
+  while (move->getData() != 0)
+  {
+    toSQs[move->getFrom()] |= BB(move->getTo());
+    move++;
+  }
+
+  for (auto i = 0; i < SQ_COUNT; i++)
+  {
+    if (toSQs[i] != 0)
+    {
+      printMoves(i, toSQs[i]);
+    }
+  }
 }

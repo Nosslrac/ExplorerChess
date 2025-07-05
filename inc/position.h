@@ -10,7 +10,7 @@ struct StateInfo final
   // Copied when making a move
   std::uint8_t castlingRights;
   square_t enPassant;
-  PieceV2 capturedPiece;
+  PieceType capturedPiece;
   score_t materialScore;
   score_t materialValue;
 
@@ -38,6 +38,8 @@ public:
   void fenInit(const std::string &fen, StateInfo &st);
   void doMove(Move move, StateInfo &newSt);
   void undoMove(Move move);
+  template <Side s> void doMove(Move move, StateInfo &newSt);
+  template <Side s> void undoMove(Move move);
 
   // Fetching pieceBoards and teamBoards (don't use with KING)
   template <Side s> constexpr bitboard_t pieces_s() const;
@@ -58,13 +60,10 @@ public:
   Position &operator=(const Position &) = delete;
 
   // Utility and setup
-  void placePiece(PieceV2 piece, square_t square);
+  void placePiece(PieceType piece, square_t square, index_t team);
   void printPieces(const std::string &fen) const;
 
 private:
-  template <Side s> void doMove(Move move, StateInfo &newSt);
-  template <Side s> void undoMove(Move move);
-
   // Small inline methods
   template <Side s> bitboard_t EPpawns() const;
 
@@ -77,7 +76,7 @@ private:
   square_t m_kings[NUM_COLORS];
   bitboard_t m_pieceBoards[NUM_TYPES];
   bitboard_t m_teamBoards[NUM_COLORS];
-  PieceV2 m_board[SQ_COUNT];
+  PieceType m_board[SQ_COUNT];
 
   // Check boards
   bitboard_t m_checkSquares[4];

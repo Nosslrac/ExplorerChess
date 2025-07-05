@@ -70,18 +70,10 @@ enum PieceType : index_t
   BISHOP,
   ROOK,
   QUEEN,
+
   NUM_TYPES = 6,
+  NO_PIECE = 0,
 
   KING = 6, // King is not part of the pieceBoards
   NUM_COLORS = 2,
 };
-
-// clang-format off
-enum PieceV2 : index_t
-{
-  NO_PIECE = 0,
-  W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING,
-  B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN, B_KING,
-};
-
-// clang-format on

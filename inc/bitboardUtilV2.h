@@ -59,7 +59,6 @@ constexpr bitboard_t NOT_EDGE =
 constexpr int CHECK_MATE = -0xFFFF;
 constexpr index_t BLACK = 1;
 constexpr index_t WHITE = 0;
-constexpr int BLACK_OFFSET = 6;
 constexpr int BOARD_DIMMENSION = 8;
 constexpr std::size_t MAX_MOVES = 100;
 
@@ -108,9 +107,12 @@ struct Masks final
   Direction LEFT;
   Direction RIGHT;
 
+  // Bitboards for masking
+  bitboard_t NOT_RIGHT_COL;
+  bitboard_t NOT_LEFT_COL;
+
   // Side related
   index_t TEAM;
-  index_t TEAM_OFFSET;
 };
 
 constexpr Masks WHITE_MASKS = {
@@ -132,8 +134,9 @@ constexpr Masks WHITE_MASKS = {
     .DOWN_LEFT = SOUTH_WEST,
     .LEFT = WEST,
     .RIGHT = EAST,
+    .NOT_RIGHT_COL = ~FileH,
+    .NOT_LEFT_COL = ~FileA,
     .TEAM = WHITE,
-    .TEAM_OFFSET = 0,
 };
 
 constexpr Masks BLACK_MASKS = {
@@ -155,13 +158,19 @@ constexpr Masks BLACK_MASKS = {
     .DOWN_LEFT = NORTH_EAST,
     .LEFT = EAST,
     .RIGHT = WEST,
+    .NOT_RIGHT_COL = ~FileA,
+    .NOT_LEFT_COL = ~FileH,
     .TEAM = BLACK,
-    .TEAM_OFFSET = BLACK_OFFSET,
 };
 
 template <Side s> inline constexpr const Masks *bitboardMasks()
 {
   return s == Side::WHITE ? &WHITE_MASKS : &BLACK_MASKS;
+}
+
+template <Direction D> inline constexpr bitboard_t shift(const bitboard_t bb)
+{
+  return D >= 0 ? bb << D : bb >> -D;
 }
 
 inline int pext(bitboard_t BB, bitboard_t mask)

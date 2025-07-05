@@ -2,6 +2,7 @@
 
 #include "bitboardUtilV2.h"
 #include "types.h"
+#include <algorithm>
 
 #ifdef PEXT
 #include "attackPextV2.h"
@@ -30,7 +31,11 @@ public:
   [[nodiscard]] constexpr bool isPromo() const { return (move >> 14U) == 3; }
   [[nodiscard]] constexpr FlagsV2 getFlags() const { return static_cast<FlagsV2>(move & 0xC000U); }
   [[nodiscard]] constexpr index_t getPromo() const { return (move >> 12U) & 0x3U; }
-
+  [[nodiscard]] constexpr index_t getData() const { return move; }
+  [[nodiscard]] constexpr index_t getSquares() const { return move & 0xFFFU; }
+  bool operator==(const Move& lhs) const {
+    return lhs.getSquares() == getSquares();
+  }
 
   static constexpr Move make(square_t from, square_t to) {
     return Move(move_t(to | (from << 6U)));
@@ -78,6 +83,14 @@ template <MoveFilter filter, Side... s> struct MoveList final
   const Move *begin() const { return moves; }
   const Move *end() const { return last; }
   constexpr index_t size() const { return last - moves; }
+  Move find(const Move move) const
+  {
+    if (auto it = std::find(begin(), end(), move); it != end())
+    {
+      return *it;
+    }
+    return Move();
+  }
 
 private:
   Move moves[BitboardUtil::MAX_MOVES];
@@ -186,15 +199,17 @@ constexpr bitboard_t PawnAttacks[2][SQ_COUNT] = {
      0x0000000000000000UL}};
 
 void print_bit_board(bitboard_t b);
+void printMove(Move move);
+void printMoves(square_t from, bitboard_t toSQs);
+void printMovelistMoves(Move *move);
+
 } // namespace PseudoAttacks
 
 namespace TempGUI {
 
-inline constexpr square_t makeSquare(const std::array<char, 2> &move)
+inline constexpr square_t makeSquare(char col, char row)
 {
-  assert(move.size() == 2);
-
-  return square_t(move.at(0) - 'a' + (('8' - move.at(1)) << 3U));
+  return square_t(col - 'a' + (('8' - row) << 3U));
 }
 
 inline std::string getCastleRights(std::uint8_t castleRights,
@@ -209,6 +224,22 @@ inline std::string getCastleRights(std::uint8_t castleRights,
     }
   }
   return castle;
+}
+
+inline Move parseMove(std::string moveNotation)
+{
+  assert(moveNotation.length() <= 5 && moveNotation.length() >= 4);
+  const square_t from = makeSquare(moveNotation.at(0), moveNotation.at(1));
+  const square_t to = makeSquare(moveNotation.at(2), moveNotation.at(3));
+  if (moveNotation.length() == 5)
+  {
+    constexpr std::string_view promos = "nbrq";
+    if (auto id = promos.find(moveNotation.at(4)); id != std::string::npos)
+    {
+      return Move::make<PROMOTION>(from, to, PieceType(id));
+    }
+  }
+  return Move::make(from, to);
 }
 
 inline std::string makeSquareNotation(square_t square)
@@ -230,7 +261,7 @@ inline std::string makeMoveNotation(Move move)
     return "(invalid move)";
   }
   return makeSquareNotation(from) + makeSquareNotation(to) +
-         " nbrq"[move.getPromo()];
+         " nbrq"[move.getPromo() + static_cast<index_t>(move.isPromo())];
 }
 
 } // namespace TempGUI

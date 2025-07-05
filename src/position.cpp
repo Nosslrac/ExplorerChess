@@ -3,9 +3,7 @@
 #include "moveGenV2.h"
 #include "types.h"
 
-#include <array>
 #include <cctype>
-#include <cstdint>
 #include <cstring>
 #include <ios>
 #include <iostream>
@@ -18,7 +16,7 @@ template void Position::undoMove<Side::WHITE>(Move);
 template void Position::undoMove<Side::BLACK>(Move);
 
 namespace {
-constexpr std::string_view PieceIndexes(" PNBRQKpnbrqk");
+constexpr std::string_view PieceIndexes(" PNBRQK pnbrqk");
 constexpr std::string_view CastlingIndexes("KQkq");
 } // namespace
 
@@ -64,7 +62,7 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   const bitboard_t fromBB = BB(from);
   const bitboard_t toBB = BB(to);
 
-  const PieceV2 mover = m_board[from];
+  const PieceType mover = m_board[from];
   const FlagsV2 flags = move.getFlags();
 
   constexpr auto team = static_cast<index_t>(s);
@@ -81,29 +79,22 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
     m_st->enPassant = SQ_NONE;
   }
 
-  /// TODO: Maybe only use PieceType
-  const auto movingType =
-      static_cast<PieceType>(m_board[from] - masks->TEAM_OFFSET);
-  constexpr index_t capturedOffset =
-      s == Side::WHITE ? BitboardUtil::BLACK_OFFSET : 0;
-  assert(movingType >= PAWN && movingType <= KING);
-
-  if (movingType == PieceType::KING)
+  if (mover == PieceType::KING)
   {
     m_kings[team] = to;
   }
   else
   {
-    m_pieceBoards[movingType] ^= fromBB ^ toBB;
+    m_pieceBoards[mover] ^= fromBB ^ toBB;
   }
 
   if (flags == QUIET_ || flags == DOUBLE_JUMP)
   {
-    const PieceV2 captured = m_board[to];
+    const PieceType captured = m_board[to];
     if (captured != NO_PIECE)
     {
       m_st->capturedPiece = captured;
-      m_pieceBoards[captured - capturedOffset] ^= toBB;
+      m_pieceBoards[captured] ^= toBB;
       m_teamBoards[team ^ 1U] ^= toBB;
     }
     m_st->enPassant = flags == DOUBLE_JUMP && hasPawnsOnEpRank<enemy>()
@@ -112,20 +103,17 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   }
   else if (flags == CASTLE)
   {
-    /// TODO: Decide if m_board should only store PieceType instead
     if (toBB & masks->CASTLE_KING_PIECES)
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_KING_ROOK_FROM_TO;
       m_board[masks->CASTLE_KING_ROOK_SOURCE] = NO_PIECE;
-      m_board[masks->CASTLE_KING_ROOK_DEST] = static_cast<PieceV2>(
-          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
+      m_board[masks->CASTLE_KING_ROOK_DEST] = ROOK;
     }
     else
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
       m_board[masks->CASTLE_QUEEN_ROOK_SOURCE] = NO_PIECE;
-      m_board[masks->CASTLE_QUEEN_ROOK_DEST] = static_cast<PieceV2>(
-          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
+      m_board[masks->CASTLE_QUEEN_ROOK_DEST] = ROOK;
     }
   }
   else if (flags == EN_PASSANT)
@@ -142,11 +130,11 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
     m_pieceBoards[PAWN] ^= toBB; // Remove pawn again
     m_pieceBoards[KNIGHT + move.getPromo()] |= toBB;
 
-    const PieceV2 captured = m_board[to];
+    const PieceType captured = m_board[to];
     if (captured != NO_PIECE)
     {
       m_st->capturedPiece = captured;
-      m_pieceBoards[captured - capturedOffset] ^= toBB;
+      m_pieceBoards[captured] ^= toBB;
       m_teamBoards[team ^ 1U] ^= toBB;
     }
   }
@@ -171,15 +159,13 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
 
 template <Side s> void Position::undoMove(Move move)
 {
-  m_st = m_st->prevSt; // Reset state
-
   const square_t from = move.getFrom();
   const square_t to = move.getTo();
   const FlagsV2 flags = move.getFlags();
   const bitboard_t fromBB = BB(from);
   const bitboard_t toBB = BB(to);
-  const PieceV2 mover = m_board[to];
-  const PieceV2 captured = m_st->capturedPiece;
+  const PieceType mover = m_board[to];
+  const PieceType captured = m_st->capturedPiece;
 
   constexpr auto team = static_cast<index_t>(s);
 
@@ -189,46 +175,37 @@ template <Side s> void Position::undoMove(Move move)
   m_board[from] = mover;
   m_board[to] = NO_PIECE; // Will be overwritten if we have a capture
 
-  const auto movingType =
-      static_cast<PieceType>(m_board[from] - masks->TEAM_OFFSET);
-  constexpr index_t capturedOffset =
-      s == Side::WHITE ? BitboardUtil::BLACK_OFFSET : 0;
-  assert(movingType >= PAWN && movingType <= KING);
-  if (movingType == PieceType::KING)
+  if (mover == PieceType::KING)
   {
     m_kings[team] = from;
   }
   else
   {
-    m_pieceBoards[movingType] ^= fromBB ^ toBB;
+    m_pieceBoards[mover] ^= fromBB ^ toBB;
   }
 
   if (flags == QUIET_ || flags == DOUBLE_JUMP)
   {}
   else if (flags == CASTLE)
   {
-    /// TODO: Decide if m_board should only store PieceType instead
     if (toBB & masks->CASTLE_KING_PIECES)
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_KING_ROOK_FROM_TO;
-      m_board[masks->CASTLE_KING_ROOK_SOURCE] = static_cast<PieceV2>(
-          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
+      m_board[masks->CASTLE_KING_ROOK_SOURCE] = ROOK;
       m_board[masks->CASTLE_KING_ROOK_DEST] = NO_PIECE;
     }
     else
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
-      m_board[masks->CASTLE_QUEEN_ROOK_SOURCE] = static_cast<PieceV2>(
-          ROOK + (capturedOffset ^ BitboardUtil::BLACK_OFFSET));
+      m_board[masks->CASTLE_QUEEN_ROOK_SOURCE] = ROOK;
       m_board[masks->CASTLE_QUEEN_ROOK_DEST] = NO_PIECE;
     }
   }
   else if (flags == EN_PASSANT)
   {
-    constexpr auto pawnType = static_cast<PieceV2>(W_PAWN + capturedOffset);
     m_pieceBoards[PAWN] ^= BB(m_st->enPassant);
     m_teamBoards[team ^ 1U] ^= BB(m_st->enPassant);
-    m_board[to + masks->DOWN] = pawnType;
+    m_board[to + masks->DOWN] = PAWN;
   }
   else
   {                                                  // Promotion
@@ -237,11 +214,12 @@ template <Side s> void Position::undoMove(Move move)
 
   if (m_st->capturedPiece != NO_PIECE)
   {
-    const auto pieceType = static_cast<PieceType>(captured - capturedOffset);
     m_board[to] = m_st->capturedPiece;
     m_teamBoards[team ^ 1U] ^= toBB;
-    m_pieceBoards[pieceType] ^= toBB;
+    m_pieceBoards[captured] ^= toBB;
   }
+
+  m_st = m_st->prevSt; // Reset state
 }
 
 bitboard_t Position::attackOn(square_t square, bitboard_t board) const
@@ -256,25 +234,20 @@ bitboard_t Position::attackOn(square_t square, bitboard_t board) const
          (MoveGen::attacks<KING>(0, square) & pieces<KING>());
 }
 
-void Position::placePiece(PieceV2 piece, square_t square)
+void Position::placePiece(PieceType piece, square_t square, const index_t team)
 {
-  assert(piece >= W_PAWN && piece <= B_KING);
+  assert(piece >= PAWN && piece <= KING);
   assert(BitboardUtil::isOnBoard(square));
+  assert(team < 2 && team >= 0);
   m_board[square] = piece;
-  if (piece < B_PAWN)
+  m_teamBoards[team] |= BB(square);
+  if (piece < KING)
   {
-    m_teamBoards[BitboardUtil::WHITE] |= BB(square);
     m_pieceBoards[piece] |= BB(square);
-  }
-  else if (piece <= B_QUEEN)
-  {
-    m_teamBoards[BitboardUtil::BLACK] |= BB(square);
-    m_pieceBoards[piece - BitboardUtil::BLACK_OFFSET] |= BB(square);
   }
   else
   {
-    m_teamBoards[piece - W_KING] |= BB(square);
-    m_kings[piece - W_KING] = square;
+    m_kings[piece - KING + team] = square;
   }
   m_pieceBoards[ALL_PIECES] |= BB(square);
 }
@@ -292,7 +265,6 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
   stream >> std::noskipws;
 
   char token = '0';
-  std::size_t id = 0;
   square_t square = 0;
 
   while ((stream >> token) && (std::isspace(token) == 0))
@@ -303,9 +275,9 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
     }
     else if (token == '/')
     {}
-    else if ((id = PieceIndexes.find(token)) != std::string::npos)
+    else if (auto id = PieceIndexes.find(token); id != std::string::npos)
     {
-      placePiece(PieceV2(id), square);
+      placePiece(PieceType((id % 7U)), square, id / 7U);
 
       square++;
     }
@@ -320,7 +292,7 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
   // Castling rights
   while ((stream >> token) && (std::isspace(token) == 0))
   {
-    if ((id = CastlingIndexes.find(token)) != std::string::npos)
+    if (auto id = CastlingIndexes.find(token); id != std::string::npos)
     {
       m_st->castlingRights |= BB(id);
     }
@@ -331,13 +303,12 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
       (stream >> epRow) && (m_whiteToMove ? '6' : '3') == epRow)
   {
     std::cout << epCol << epRow;
-    m_st->enPassant = TempGUI::makeSquare(std::array<char, 2>{epCol, epRow});
+    m_st->enPassant = TempGUI::makeSquare(epCol, epRow);
   }
   if (m_st->enPassant == 0)
   {
     m_st->enPassant = SQ_NONE;
   }
-  printPieces(fen);
 }
 
 void Position::printPieces(const std::string &fen) const
@@ -345,12 +316,16 @@ void Position::printPieces(const std::string &fen) const
   char rank = '8';
   std::string stb;
   stb += "\n +---+---+---+---+---+---+---+---+\n";
-  for (int i = 0; i < 8; i++)
+  for (int i = 0; i < BitboardUtil::BOARD_DIMMENSION; i++)
   {
-    for (int j = 0; j < 8; j++)
+    for (int j = 0; j < BitboardUtil::BOARD_DIMMENSION; j++)
     {
       stb += " | ";
-      stb += PieceIndexes.at(m_board[i * 8 + j]);
+      const bool black = BB((i * BitboardUtil::BOARD_DIMMENSION + j)) &
+                         m_teamBoards[BitboardUtil::BLACK];
+      const auto piece =
+          m_board[i * BitboardUtil::BOARD_DIMMENSION + j] + black * 7;
+      stb += PieceIndexes.at(piece);
     }
     stb += " | ";
     stb += rank;
@@ -363,9 +338,13 @@ void Position::printPieces(const std::string &fen) const
   std::cout << "Fen: " << fen << "\n";
   std::cout << "Side to move: " << (m_whiteToMove ? "WHITE\n" : "BLACK\n");
   std::cout << "Castling rights: "
-            << TempGUI::getCastleRights(m_st->castlingRights, CastlingIndexes)
+            << TempGUI::getCastleRights((m_st != nullptr) ? m_st->castlingRights
+                                                          : 0,
+                                        CastlingIndexes)
             << "\n";
-  std::cout << "En passant: " << TempGUI::makeSquareNotation(m_st->enPassant)
+  std::cout << "En passant: "
+            << TempGUI::makeSquareNotation((m_st != nullptr) ? m_st->enPassant
+                                                             : SQ_NONE)
             << std::endl;
   // GUI::getCheckers(checker, pos.st.checkers);
   // std::cout << "\nHash key: " << pos.st.hashKey << "\nChecker: " << checker
