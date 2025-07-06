@@ -147,12 +147,15 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
   // Generate one step pushes and double pushes
   // All legal single push moves
   const bitboard_t singlePush =
-      BitboardUtil::shift<masks->UP>(nonPinnedPawms) & ~allPieces & targetSQs;
+      BitboardUtil::shift<masks->UP>(nonPinnedPawms) & ~allPieces;
   // All legal double push moves
   const bitboard_t doublePush =
-      BitboardUtil::shift<masks->UP>(singlePush) & ~allPieces & targetSQs;
+      BitboardUtil::shift<masks->UP>(singlePush &
+                                     masks->POTENTIAL_DOUBLE_PUSHERS) &
+      ~allPieces & targetSQs;
 
-  for (bitboard_t squares = singlePush; squares != 0; squares &= squares - 1)
+  for (bitboard_t squares = singlePush & targetSQs; squares != 0;
+       squares &= squares - 1)
   {
     const square_t square = BitboardUtil::bitScan(squares);
     *moveList++ = Move::make(square + masks->DOWN, square);
@@ -231,7 +234,7 @@ Move *generate(const Position &pos, Move *moveList)
       : filter == MoveFilter::CAPTURES ? enemyPieces
       : filter == MoveFilter::QUIETS   ? ~enemyPieces
                                        : 0;
-  const bitboard_t targetSQs =
+  const bitboard_t fullFilter =
       partialFilter & ~friendlyPieces; // Can't capture own pieces
 
   const square_t kingSquare = pos.kingSquare<s>();
@@ -240,8 +243,30 @@ Move *generate(const Position &pos, Move *moveList)
 
   if (!BitboardUtil::moreThanOne(checkBoard))
   {
-    /// TODO: Get the actually pinned pieces
-    const bitboard_t pinned = 0;
+    /// Maximum of one checker
+    bitboard_t pinned = 0;
+    const bitboard_t snipers =
+        enemyPieces &
+        ((attacks<ROOK>(0, kingSquare) & (pos.pieces<ROOK, QUEEN>())) |
+         (attacks<BISHOP>(0, kingSquare) & pos.pieces<BISHOP, QUEEN>()));
+    for (bitboard_t snips = snipers; snips != 0; snips &= snips - 1)
+    {
+      square_t sniper = BitboardUtil::bitScan(snips);
+      const bitboard_t blockers =
+          RayConstants::betweenBB(sniper, kingSquare) & allPieces;
+      if (BitboardUtil::bitCount(blockers) == 1)
+      {
+        pinned |= blockers;
+      }
+    }
+
+    const bitboard_t checkFilter =
+        checkBoard == 0 ? BitboardUtil::All_SQ
+                        : RayConstants::betweenBB(
+                              BitboardUtil::bitScan(checkBoard), kingSquare) |
+                              checkBoard;
+    const bitboard_t targetSQs = fullFilter & checkFilter;
+
     moveList = generatePawnMoves<s, filter>(pos, moveList, targetSQs, pinned);
     moveList = generatePieceMoves<s, KNIGHT>(pos, moveList, targetSQs, pinned);
     moveList = generatePieceMoves<s, BISHOP>(pos, moveList, targetSQs, pinned);
@@ -250,7 +275,7 @@ Move *generate(const Position &pos, Move *moveList)
   }
 
   // King moves
-  bitboard_t kingStandard = attacks<KING>(0, kingSquare) & targetSQs;
+  bitboard_t kingStandard = attacks<KING>(0, kingSquare) & fullFilter;
   const bitboard_t boardWithoutKing = allPieces & ~BB(kingSquare);
 
   for (; kingStandard != 0; kingStandard &= kingStandard - 1)
@@ -333,37 +358,6 @@ template bitboard_t attacks<Side::BLACK, PAWN>(const bitboard_t,
                                                const square_t);
 
 } // namespace MoveGen
-
-template <Side s> std::uint64_t bulkCount(Position &pos, int depth)
-{
-  const MoveGen::MoveList<MoveFilter::ALL, s> moveList(pos);
-  if (depth == 1)
-  {
-    return moveList.size();
-  }
-  // StateInfo newSt;
-  std::uint64_t count = 0;
-  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
-
-  for (const auto &move : moveList)
-  {
-    StateInfo newState;
-    pos.doMove<s>(move, newState);
-    auto part = bulkCount<enemy>(pos, depth - 1);
-    count += part;
-    pos.undoMove<enemy>(move);
-    std::cout << TempGUI::makeMoveNotation(move) << ": " << part << "\n";
-  }
-  return count;
-}
-
-void Perft::perft(Position &pos, int depth)
-{
-  auto count = pos.isWhiteToMove() ? bulkCount<Side::WHITE>(pos, depth)
-                                   : bulkCount<Side::BLACK>(pos, depth);
-
-  std::cout << "Total nodes visited: " << count << "\n";
-}
 
 void PseudoAttacks::print_bit_board(bitboard_t b)
 {

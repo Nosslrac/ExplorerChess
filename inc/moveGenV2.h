@@ -81,6 +81,7 @@ template <MoveFilter filter, Side... s> struct MoveList final
       : last(generate<filter, s...>(pos, moves)){};
   constexpr void add(move_t move) { *last++ = Move(move); }
   const Move *begin() const { return moves; }
+  Move *start() { return moves; }
   const Move *end() const { return last; }
   constexpr index_t size() const { return last - moves; }
   Move find(const Move move) const
@@ -98,10 +99,6 @@ private:
 };
 
 } // namespace MoveGen
-
-namespace Perft {
-void perft(Position &pos, int depth);
-}
 
 namespace PseudoAttacks {
 constexpr bitboard_t KnightAttacks[SQ_COUNT] = {

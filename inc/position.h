@@ -11,16 +11,16 @@ struct StateInfo final
   std::uint8_t castlingRights;
   square_t enPassant;
   PieceType capturedPiece;
-  score_t materialScore;
-  score_t materialValue;
+  score_t materialScore = 0;
+  score_t materialValue = 0;
 
   // Recomputed during doMove
-  bitboard_t blockForKing;
-  bitboard_t pinnedMask;
-  bitboard_t checkers;
+  bitboard_t blockForKing = 0;
+  bitboard_t pinnedMask = 0;
+  bitboard_t checkers = 0;
 
-  bitboard_t hashKey;
-  StateInfo *prevSt;
+  bitboard_t hashKey = 0;
+  StateInfo *prevSt = nullptr;
 
   constexpr StateInfo()
       : castlingRights(0), enPassant(SQ_NONE), capturedPiece(NO_PIECE)
@@ -47,7 +47,10 @@ public:
   template <Side s, PieceType... pts> constexpr bitboard_t pieces() const;
   template <Side s> constexpr square_t kingSquare() const;
 
+  /// @brief Returns a bitboard of all attackes to a square (both sides)
   bitboard_t attackOn(square_t square, bitboard_t board) const;
+  StateInfo *st() const { return m_st; }
+  constexpr PieceType pieceOn(square_t square) const;
   template <Side s>
   constexpr bool isSafeSquares(bitboard_t squaresToCheck,
                                bitboard_t board) const;
@@ -62,6 +65,7 @@ public:
   // Utility and setup
   void placePiece(PieceType piece, square_t square, index_t team);
   void printPieces(const std::string &fen) const;
+  void printState() const;
 
 private:
   // Small inline methods
@@ -118,6 +122,11 @@ template <Side s, PieceType... pts>
 inline constexpr bitboard_t Position::pieces() const
 {
   return pieces_s<s>() & pieces<pts...>();
+}
+
+inline constexpr PieceType Position::pieceOn(square_t square) const
+{
+  return m_board[square];
 }
 
 template <Side s> inline bool Position::hasPawnsOnEpRank() const

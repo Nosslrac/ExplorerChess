@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "Engine.h"
+#include "position.h"
 
 namespace ExplorerChess {
 enum class EngineMode
@@ -38,9 +39,8 @@ private:
 };
 
 namespace UCI {
-const std::string ENGINE_ID{"ExplorerChessV1"};
+constexpr std::string_view ENGINE_ID{"ExplorerChessV1"};
 void uciInput();
-void runUCI(EngineParser *parser, Engine *engine);
 void runUCI(EngineParser *parser, Engine *engine);
 } // namespace UCI
 

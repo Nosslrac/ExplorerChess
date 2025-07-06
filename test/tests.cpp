@@ -9,14 +9,9 @@ namespace ExplorerChessTest {
 bool testPos(const enginePtr &engine, std::string &&fen, const bitboard_t count,
              const int depth)
 {
-  Position pos;
-  engine->fenInit(pos, fen);
+  engine->initFen(fen);
 
-  if (pos.whiteToMove)
-  {
-    return engine->perft<true>(pos, depth) == count;
-  }
-  return engine->perft<false>(pos, depth) == count;
+  return engine->runPerft(depth) == count;
 }
 
 // clang-format off

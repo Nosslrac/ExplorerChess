@@ -110,6 +110,7 @@ struct Masks final
   // Bitboards for masking
   bitboard_t NOT_RIGHT_COL;
   bitboard_t NOT_LEFT_COL;
+  bitboard_t POTENTIAL_DOUBLE_PUSHERS;
 
   // Side related
   index_t TEAM;
@@ -136,6 +137,7 @@ constexpr Masks WHITE_MASKS = {
     .RIGHT = EAST,
     .NOT_RIGHT_COL = ~FileH,
     .NOT_LEFT_COL = ~FileA,
+    .POTENTIAL_DOUBLE_PUSHERS = Rank6,
     .TEAM = WHITE,
 };
 
@@ -160,6 +162,7 @@ constexpr Masks BLACK_MASKS = {
     .RIGHT = WEST,
     .NOT_RIGHT_COL = ~FileA,
     .NOT_LEFT_COL = ~FileH,
+    .POTENTIAL_DOUBLE_PUSHERS = Rank3,
     .TEAM = BLACK,
 };
 

@@ -1541,4 +1541,12 @@ constexpr bitboard_t RayBB[SQ_COUNT][SQ_COUNT] = {
     },
 };
 
+inline constexpr bitboard_t betweenBB(square_t sq1, square_t sq2)
+{
+  constexpr bitboard_t ALL_SQ = ~0ULL;
+  const bitboard_t between =
+      RayBB[sq1][sq2] & ((ALL_SQ << sq1) ^ (ALL_SQ << sq2));
+  return between & (between - 1); // exclude lsb
 }
+
+} // namespace RayConstants

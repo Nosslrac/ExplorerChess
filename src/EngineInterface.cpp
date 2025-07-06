@@ -1,12 +1,12 @@
 #include "EngineInterface.h"
+#include "Engine.h"
+#include "moveGenV2.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
-
-#include "Engine.h"
-#include "GUI.h"
 
 namespace ExplorerChess {
 namespace UCI {
@@ -18,7 +18,7 @@ inline void runGo(const std::unique_ptr<CommandArgs> &args, Engine &engine)
   {
     int depth = std::stoi(args->getNext()->getArg());
     auto start = std::chrono::system_clock::now();
-    engine.goPerft(static_cast<uint32_t>(depth));
+    engine.runPerft(depth);
     auto end = std::chrono::system_clock::now();
     auto duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
@@ -43,11 +43,11 @@ inline void setPosition(const CommandArgs &args, Engine &engine)
   const std::string &secondArg = args.getArg();
   if (secondArg == "startpos")
   {
-    engine.position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    engine.initFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
   }
   else if (secondArg == "fen")
   {
-    engine.position(args.getNext()->getArg());
+    engine.initFen(args.getNext()->getArg());
   }
   else
   {
@@ -57,12 +57,15 @@ inline void setPosition(const CommandArgs &args, Engine &engine)
 
 inline void makeMove(const CommandArgs &args, Engine &engine)
 {
-  engine.makeMove(args.getArg());
+  engine.makeMove(TempGUI::parseMove(args.getArg()));
 }
+
+inline void undoMove(Engine &engine) { engine.undoMove(); }
 
 void EngineParser::runInterface()
 {
   std::cout << "Welcome to ExplorerChess v1.0\n";
+  m_engine.initFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
   while (true)
   {
     receiveInput();
@@ -125,7 +128,11 @@ void EngineParser::receiveInput()
   }
   else if (args.getArg() == "d")
   {
-    GUI::print_pieces(m_engine.getPos());
+    m_engine.printPieces();
+  }
+  else if (args.getArg() == "p")
+  {
+    m_engine.printMoves();
   }
   else if (args.getArg() == "position")
   {
@@ -134,6 +141,10 @@ void EngineParser::receiveInput()
   else if (args.getArg() == "make")
   {
     makeMove(*args.getNext(), m_engine);
+  }
+  else if (args.getArg() == "unmake")
+  {
+    undoMove(m_engine);
   }
   else if (args.getArg() == "uci")
   {

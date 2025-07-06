@@ -63,6 +63,7 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   const bitboard_t toBB = BB(to);
 
   const PieceType mover = m_board[from];
+  const PieceType captured = m_board[to];
   const FlagsV2 flags = move.getFlags();
 
   constexpr auto team = static_cast<index_t>(s);
@@ -90,7 +91,6 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
 
   if (flags == QUIET_ || flags == DOUBLE_JUMP)
   {
-    const PieceType captured = m_board[to];
     if (captured != NO_PIECE)
     {
       m_st->capturedPiece = captured;
@@ -130,7 +130,6 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
     m_pieceBoards[PAWN] ^= toBB; // Remove pawn again
     m_pieceBoards[KNIGHT + move.getPromo()] |= toBB;
 
-    const PieceType captured = m_board[to];
     if (captured != NO_PIECE)
     {
       m_st->capturedPiece = captured;
@@ -167,7 +166,7 @@ template <Side s> void Position::undoMove(Move move)
   const PieceType mover = m_board[to];
   const PieceType captured = m_st->capturedPiece;
 
-  constexpr auto team = static_cast<index_t>(s);
+  constexpr auto team = static_cast<index_t>(s) ^ 1U;
 
   constexpr const BitboardUtil::Masks *masks = BitboardUtil::bitboardMasks<s>();
 
@@ -212,13 +211,19 @@ template <Side s> void Position::undoMove(Move move)
     m_pieceBoards[KNIGHT + move.getPromo()] ^= toBB; // Remove promotion piece
   }
 
-  if (m_st->capturedPiece != NO_PIECE)
+  if (captured != NO_PIECE)
   {
-    m_board[to] = m_st->capturedPiece;
+    m_board[to] = captured;
     m_teamBoards[team ^ 1U] ^= toBB;
     m_pieceBoards[captured] ^= toBB;
   }
 
+  // Restore occupied
+  m_pieceBoards[ALL_PIECES] =
+      m_teamBoards[BitboardUtil::WHITE] | m_teamBoards[BitboardUtil::BLACK];
+
+  m_whiteToMove = !m_whiteToMove;
+  m_ply--;
   m_st = m_st->prevSt; // Reset state
 }
 
@@ -302,7 +307,6 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
   if ((stream >> epCol) && (epCol >= 'a' && epCol <= 'h') &&
       (stream >> epRow) && (m_whiteToMove ? '6' : '3') == epRow)
   {
-    std::cout << epCol << epRow;
     m_st->enPassant = TempGUI::makeSquare(epCol, epRow);
   }
   if (m_st->enPassant == 0)
@@ -349,4 +353,16 @@ void Position::printPieces(const std::string &fen) const
   // GUI::getCheckers(checker, pos.st.checkers);
   // std::cout << "\nHash key: " << pos.st.hashKey << "\nChecker: " << checker
   //           << "\n\n";
+}
+
+void Position::printState() const
+{
+  std::cout << "Castling: " << static_cast<int>(m_st->castlingRights) << "\n";
+  std::cout << "En passant: " << static_cast<int>(m_st->enPassant) << "\n";
+  std::cout << "Captured piece: " << static_cast<int>(m_st->capturedPiece)
+            << "\n";
+  std::cout << "Block for king: " << static_cast<int>(m_st->blockForKing)
+            << "\n";
+  std::cout << "Pinned mask: " << static_cast<int>(m_st->pinnedMask) << "\n";
+  std::cout << "Checkers: " << static_cast<int>(m_st->checkers) << "\n";
 }
