@@ -37,7 +37,7 @@ namespace Perft {
 std::uint64_t perft(Position &pos, int depth);
 }
 
-Engine::Engine() : m_pos{}, m_historyList(std::make_unique<historyList_t>()){};
+Engine::Engine() : m_pos{}, m_historyList(std::make_unique<historyList_t>()) {};
 
 namespace {
 bool validateMove(Move &pseudoLegalMove, const Position &pos)
@@ -45,6 +45,17 @@ bool validateMove(Move &pseudoLegalMove, const Position &pos)
   pseudoLegalMove =
       MoveGen::MoveList<MoveFilter::ALL>(pos).find(pseudoLegalMove);
   return pseudoLegalMove.getData() != 0;
+}
+
+void validateBitboard(const bitboard_t b1, const bitboard_t b2,
+                      const std::string &name)
+{
+  if (b1 != b2)
+  {
+    std::cout << "## Bitboard missmatch: " << name << "\n";
+    PseudoAttacks::print_bit_board(b1);
+    PseudoAttacks::print_bit_board(b2);
+  }
 }
 
 bool moveIntegrity(const Position &pos1, const Position &pos2, Move move,
@@ -55,36 +66,28 @@ bool moveIntegrity(const Position &pos1, const Position &pos2, Move move,
       std::memcmp(pos1.st(), pos2.st(), sizeof(StateInfo)) == 0;
   if (!result || !stateEq)
   {
-    for (int square = SQ_A8; square <= SQ_H1; square++)
+    std::cout << TempGUI::makeMoveNotation(move) << ": at depth " << depth
+              << " failed integrity\n";
+    for (square_t square = SQ_A8; square <= SQ_H1; square++)
     {
       if (pos1.pieceOn(square) != pos2.pieceOn(square))
       {
-        std::cout << "All pieces: " << static_cast<int>(pos1.pieceOn(square))
-                  << " - " << static_cast<int>(pos2.pieceOn(square)) << "\n";
+        std::cout << "Board miss match: "
+                  << static_cast<int>(pos1.pieceOn(square)) << " - "
+                  << static_cast<int>(pos2.pieceOn(square)) << "\n";
       }
     }
-    std::cout << "All pieces: " << pos1.pieces<ALL_PIECES>() << " - "
-              << pos2.pieces<ALL_PIECES>() << "\n";
-    std::cout << TempGUI::makeMoveNotation(move) << ": " << pos1.isWhiteToMove()
-              << " - " << depth << "\n";
-    std::cout << "All pieces: " << pos1.pieces<ALL_PIECES>() << " - "
-              << pos2.pieces<ALL_PIECES>() << "\n";
-    PseudoAttacks::print_bit_board(pos1.pieces_s<Side::WHITE>());
-    PseudoAttacks::print_bit_board(pos1.pieces_s<Side::BLACK>());
-    pos1.printPieces("");
-    pos2.printPieces("");
-    std::cout << "Black pieces: " << pos1.pieces_s<Side::BLACK>() << " - "
-              << pos2.pieces_s<Side::BLACK>() << "\n";
-    std::cout << "Piece type: " << pos1.pieces<PAWN>() << " - "
-              << pos2.pieces<PAWN>() << "\n";
-    std::cout << "Piece type: " << pos1.pieces<KNIGHT>() << " - "
-              << pos2.pieces<KNIGHT>() << "\n";
-    std::cout << "Piece type: " << pos1.pieces<BISHOP>() << " - "
-              << pos2.pieces<BISHOP>() << "\n";
-    std::cout << "Piece type: " << pos1.pieces<ROOK>() << " - "
-              << pos2.pieces<ROOK>() << "\n";
-    std::cout << "Piece type: " << pos1.pieces<QUEEN>() << " - "
-              << pos2.pieces<QUEEN>() << "\n";
+    validateBitboard(pos1.pieces<ALL_PIECES>(), pos2.pieces<ALL_PIECES>(),
+                     "All pieces");
+    validateBitboard(pos1.pieces_s<Side::WHITE>(), pos2.pieces_s<Side::WHITE>(),
+                     "Side white");
+    validateBitboard(pos1.pieces_s<Side::BLACK>(), pos2.pieces_s<Side::BLACK>(),
+                     "Side black");
+    validateBitboard(pos1.pieces<PAWN>(), pos2.pieces<PAWN>(), "Pawn");
+    validateBitboard(pos1.pieces<KNIGHT>(), pos2.pieces<KNIGHT>(), "Knight");
+    validateBitboard(pos1.pieces<BISHOP>(), pos2.pieces<BISHOP>(), "Bishop");
+    validateBitboard(pos1.pieces<ROOK>(), pos2.pieces<ROOK>(), "Rook");
+    validateBitboard(pos1.pieces<QUEEN>(), pos2.pieces<QUEEN>(), "Queen");
   }
   return result;
 }
@@ -128,11 +131,11 @@ void Engine::makeMove(Move move)
 {
   if (validateMove(move, m_pos))
   {
+    std::cout << TempGUI::makeMoveNotation(move)
+              << " - Flags: " << move.getFlags() << "\n";
     // Insert new History entry for the move to be made
     m_historyList->push_back(History(move, StateInfo()));
     m_pos.doMove(move, m_historyList->back().state);
-    std::cout << "Size of history after make: " << m_historyList->size()
-              << "\n";
   }
   else
   {

@@ -55,7 +55,7 @@ enum Flags
 
 enum FlagsV2 : move_t
 {
-  QUIET_ = 0,
+  NO_FLAG = 0,
   DOUBLE_JUMP = 2U << 12U,
   EN_PASSANT = 1U << 14U,
   CASTLE = 2U << 14U,

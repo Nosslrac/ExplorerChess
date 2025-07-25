@@ -10,11 +10,6 @@
 #include <sstream>
 #include <string_view>
 
-template void Position::doMove<Side::WHITE>(Move, StateInfo &);
-template void Position::doMove<Side::BLACK>(Move, StateInfo &);
-template void Position::undoMove<Side::WHITE>(Move);
-template void Position::undoMove<Side::BLACK>(Move);
-
 namespace {
 constexpr std::string_view PieceIndexes(" PNBRQK pnbrqk");
 constexpr std::string_view CastlingIndexes("KQkq");
@@ -72,6 +67,7 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   constexpr const BitboardUtil::Masks *masks = BitboardUtil::bitboardMasks<s>();
 
   m_teamBoards[team] ^= fromBB ^ toBB;
+  m_st->capturedPiece = captured;
   m_board[to] = mover; // Will be overwritten if we have a promotion
 
   // Remove ep possiblity
@@ -89,7 +85,7 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
     m_pieceBoards[mover] ^= fromBB ^ toBB;
   }
 
-  if (flags == QUIET_ || flags == DOUBLE_JUMP)
+  if (flags == NO_FLAG)
   {
     if (captured != NO_PIECE)
     {
@@ -97,9 +93,10 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
       m_pieceBoards[captured] ^= toBB;
       m_teamBoards[team ^ 1U] ^= toBB;
     }
-    m_st->enPassant = flags == DOUBLE_JUMP && hasPawnsOnEpRank<enemy>()
-                          ? static_cast<square_t>(to + masks->UP)
-                          : SQ_NONE;
+    if (move.isDoubleJump() && hasPawnsOnEpRank<enemy>())
+    {
+      m_st->enPassant = static_cast<square_t>(to + masks->DOWN);
+    }
   }
   else if (flags == CASTLE)
   {
@@ -183,8 +180,9 @@ template <Side s> void Position::undoMove(Move move)
     m_pieceBoards[mover] ^= fromBB ^ toBB;
   }
 
-  if (flags == QUIET_ || flags == DOUBLE_JUMP)
-  {}
+  if (flags == NO_FLAG || flags == DOUBLE_JUMP)
+  {
+  }
   else if (flags == CASTLE)
   {
     if (toBB & masks->CASTLE_KING_PIECES)
@@ -204,7 +202,7 @@ template <Side s> void Position::undoMove(Move move)
   {
     m_pieceBoards[PAWN] ^= BB(m_st->enPassant);
     m_teamBoards[team ^ 1U] ^= BB(m_st->enPassant);
-    m_board[to + masks->DOWN] = PAWN;
+    m_board[to + masks->UP] = PAWN;
   }
   else
   {                                                  // Promotion
@@ -237,6 +235,35 @@ bitboard_t Position::attackOn(square_t square, bitboard_t board) const
          (MoveGen::attacks<BISHOP>(board, square) & pieces<BISHOP, QUEEN>()) |
          (MoveGen::attacks<KNIGHT>(0, square) & pieces<KNIGHT>()) |
          (MoveGen::attacks<KING>(0, square) & pieces<KING>());
+}
+
+bool Position::isSafeSquares(bitboard_t squaresToCheck, bitboard_t board) const
+{
+  for (; squaresToCheck != 0; squaresToCheck &= squaresToCheck - 1)
+  {
+    if (attackOn(BitboardUtil::bitScan(squaresToCheck), board) != 0UL)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <Side s>
+bool Position::isSpecialEnPassantKingPin(const square_t kingSquare,
+                                         const bitboard_t epPawns,
+                                         const BitboardUtil::Masks *masks) const
+{
+  constexpr index_t side = static_cast<index_t>(s);
+  constexpr Side enemy = static_cast<Side>(side ^ 1U);
+  const bitboard_t realPawn =
+      BB(static_cast<index_t>(m_st->enPassant + masks->DOWN));
+  const bitboard_t snipers = pieces<enemy, ROOK, QUEEN>();
+  return (BB(kingSquare) & masks->EP_RANK) != 0 &&
+         (snipers & masks->EP_RANK) != 0 &&
+         (MoveGen::attacks<ROOK>(pieces<ALL_PIECES>() & ~(epPawns | realPawn),
+                                 kingSquare) &
+          snipers) != 0;
 }
 
 void Position::placePiece(PieceType piece, square_t square, const index_t team)
@@ -279,7 +306,8 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
       square += (token - '0');
     }
     else if (token == '/')
-    {}
+    {
+    }
     else if (auto id = PieceIndexes.find(token); id != std::string::npos)
     {
       placePiece(PieceType((id % 7U)), square, id / 7U);
@@ -366,3 +394,10 @@ void Position::printState() const
   std::cout << "Pinned mask: " << static_cast<int>(m_st->pinnedMask) << "\n";
   std::cout << "Checkers: " << static_cast<int>(m_st->checkers) << "\n";
 }
+
+template bool Position::isSpecialEnPassantKingPin<Side::WHITE>(
+    const square_t kingSquare, const bitboard_t epPawns,
+    const BitboardUtil::Masks *masks) const;
+template bool Position::isSpecialEnPassantKingPin<Side::BLACK>(
+    const square_t kingSquare, const bitboard_t epPawns,
+    const BitboardUtil::Masks *masks) const;

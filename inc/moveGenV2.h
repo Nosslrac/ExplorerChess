@@ -27,12 +27,12 @@ public:
   constexpr explicit Move(move_t m) : move(m) {}
   [[nodiscard]] constexpr Square getTo() const { return Square(move & 0x3FU); }
   [[nodiscard]] constexpr Square getFrom() const { return Square((move >> 6U) & 0x3FU); }
-  [[nodiscard]] constexpr bool isDoubleJump() const { return (move >> 12U) == 2; }
+  [[nodiscard]] constexpr bool isDoubleJump() const { return (move >> 12U) == 2 && !isPromo(); }
   [[nodiscard]] constexpr bool isPromo() const { return (move >> 14U) == 3; }
   [[nodiscard]] constexpr FlagsV2 getFlags() const { return static_cast<FlagsV2>(move & 0xC000U); }
   [[nodiscard]] constexpr index_t getPromo() const { return (move >> 12U) & 0x3U; }
-  [[nodiscard]] constexpr index_t getData() const { return move; }
-  [[nodiscard]] constexpr index_t getSquares() const { return move & 0xFFFU; }
+  [[nodiscard]] constexpr move_t getData() const { return move; }
+  [[nodiscard]] constexpr move_t getSquares() const { return move & 0xFFFU; }
   bool operator==(const Move& lhs) const {
     return lhs.getSquares() == getSquares();
   }
@@ -78,7 +78,7 @@ bitboard_t attacks(bitboard_t occupancy, square_t square);
 template <MoveFilter filter, Side... s> struct MoveList final
 {
   explicit MoveList(const Position &pos)
-      : last(generate<filter, s...>(pos, moves)){};
+      : last(generate<filter, s...>(pos, moves)) {};
   constexpr void add(move_t move) { *last++ = Move(move); }
   const Move *begin() const { return moves; }
   Move *start() { return moves; }
@@ -257,8 +257,8 @@ inline std::string makeMoveNotation(Move move)
   {
     return "(invalid move)";
   }
-  return makeSquareNotation(from) + makeSquareNotation(to) +
-         " nbrq"[move.getPromo() + static_cast<index_t>(move.isPromo())];
+  const int promo = move.isPromo() ? move.getPromo() + 1 : 0;
+  return makeSquareNotation(from) + makeSquareNotation(to) + " nbrq"[promo];
 }
 
 } // namespace TempGUI

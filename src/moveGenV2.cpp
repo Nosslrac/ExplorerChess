@@ -137,6 +137,40 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
         }
       }
     }
+
+    const square_t epSquare = pos.st()->enPassant;
+    if (epSquare != SQ_NONE)
+    {
+      const bitboard_t epBB = BB(epSquare);
+      const bitboard_t epCaptureRight =
+          BitboardUtil::shift<masks->DOWN_LEFT>(epBB & masks->NOT_RIGHT_COL) &
+          pawns;
+      const bitboard_t epCaptureLeft =
+          BitboardUtil::shift<masks->DOWN_RIGHT>(epBB & masks->NOT_LEFT_COL) &
+          pawns;
+
+      const square_t kingSquare = pos.kingSquare<s>();
+      const auto fromRight = static_cast<square_t>(epSquare + masks->DOWN_LEFT);
+      const auto fromLeft = static_cast<square_t>(epSquare + masks->DOWN_RIGHT);
+
+      if (epCaptureRight != 0 &&
+          ((epCaptureRight & pinnedPawns) == 0 ||
+           (RayConstants::RayBB[fromRight][kingSquare] & epBB) != 0) &&
+          !pos.isSpecialEnPassantKingPin<s>(
+              kingSquare, epCaptureRight | epCaptureLeft, masks))
+      {
+        *moveList++ = Move::make<EN_PASSANT>(fromRight, epSquare);
+      }
+
+      if (epCaptureLeft != 0 &&
+          ((epCaptureLeft & pinnedPawns) == 0 ||
+           (RayConstants::RayBB[fromRight][kingSquare] & epBB) != 0) &&
+          !pos.isSpecialEnPassantKingPin<s>(
+              kingSquare, epCaptureRight | epCaptureLeft, masks))
+      {
+        *moveList++ = Move::make<EN_PASSANT>(fromLeft, epSquare);
+      }
+    }
   }
 
   if constexpr (filter == MoveFilter::CAPTURES)
@@ -164,7 +198,8 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
   for (bitboard_t squares = doublePush; squares != 0; squares &= squares - 1)
   {
     const square_t square = BitboardUtil::bitScan(squares);
-    *moveList++ = Move::make(square + masks->DOWN + masks->DOWN, square);
+    *moveList++ =
+        Move::make<DOUBLE_JUMP>(square + masks->DOWN + masks->DOWN, square);
   }
 
   if (pinnedPawns)
@@ -197,7 +232,8 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
       const square_t from = square + masks->DOWN;
       if (RayConstants::RayBB[from][kingSquare] & BB(square))
       {
-        *moveList++ = Move::make(square + masks->DOWN + masks->DOWN, square);
+        *moveList++ =
+            Move::make<DOUBLE_JUMP>(square + masks->DOWN + masks->DOWN, square);
       }
     }
   }
@@ -294,7 +330,7 @@ Move *generate(const Position &pos, Move *moveList)
   // Castling king moves
   if (((masks->CASTLE_KING_PIECES & allPieces) == 0) &&
       (pos.castleRights<s>() & 1) &&
-      (pos.isSafeSquares<s>(masks->CASTLE_KING_ATTACK_SQUARES, allPieces)))
+      (pos.isSafeSquares(masks->CASTLE_KING_ATTACK_SQUARES, allPieces)))
   {
     *moveList++ = Move::make<CASTLE>(kingSquare, kingSquare + 2);
   }
@@ -302,7 +338,7 @@ Move *generate(const Position &pos, Move *moveList)
   // Castling queen side
   if (((masks->CASTLE_QUEEN_PIECES & allPieces) == 0) &&
       (pos.castleRights<s>() & 1) &&
-      (pos.isSafeSquares<s>(masks->CASTLE_QUEEN_ATTACK_SQUARES, allPieces)))
+      (pos.isSafeSquares(masks->CASTLE_QUEEN_ATTACK_SQUARES, allPieces)))
   {
     *moveList++ = Move::make<CASTLE>(kingSquare, kingSquare - 2);
   }
