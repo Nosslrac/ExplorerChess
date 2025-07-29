@@ -51,11 +51,12 @@ public:
   bitboard_t attackOn(square_t square, bitboard_t board) const;
   StateInfo *st() const { return m_st; }
   constexpr PieceType pieceOn(square_t square) const;
-  bool isSafeSquares(bitboard_t squaresToCheck, bitboard_t board) const;
+  bool isSafeSquares(bitboard_t squaresToCheck, bitboard_t board,
+                     bitboard_t attackers) const;
 
   template <Side s> bool hasPawnsOnEpRank() const;
   template <Side s>
-  bool isSpecialEnPassantKingPin(square_t kingSquare, bitboard_t epPawns,
+  bool isSpecialEnPassantKingPin(bitboard_t epPawn,
                                  const BitboardUtil::Masks *masks) const;
   bool isWhiteToMove() const;
   template <Side s> constexpr std::uint8_t castleRights() const;
@@ -111,7 +112,7 @@ template <> inline constexpr bitboard_t Position::pieces<KING>() const
 
 template <Side s> inline constexpr bitboard_t Position::pieces_s() const
 {
-  return m_teamBoards[static_cast<std::uint8_t>(s)];
+  return m_teamBoards[static_cast<index_t>(s)];
 }
 
 template <PieceType... pts> inline constexpr bitboard_t Position::pieces() const

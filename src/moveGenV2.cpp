@@ -29,8 +29,6 @@ Move *generatePieceMoves(const Position &pos, Move *moveList,
   const bitboard_t nonPinnedMovers = movers & ~pinnedPieces;
   const bitboard_t allPieces = pos.pieces<ALL_PIECES>();
 
-  assert((pinnedMovers | nonPinnedMovers) == movers);
-
   // Non pinned pieces
   for (bitboard_t pieces = nonPinnedMovers; pieces != 0; pieces &= pieces - 1)
   {
@@ -67,7 +65,7 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
 {
   // Useful constants
   constexpr auto masks = BitboardUtil::bitboardMasks<s>();
-  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
+  constexpr Side enemy = BitboardUtil::opposite<s>();
   const bitboard_t pawns = pos.pieces<s, PAWN>();
   const bitboard_t pinnedPawns = pawns & pinnedPieces;
   const bitboard_t nonPinnedPawms = pawns & ~pinnedPieces;
@@ -79,12 +77,12 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
   {
     // Generate legal non pinned capture moves
     const bitboard_t nonPinnedCaptureRight =
-        BitboardUtil::shift<masks->UP_RIGHT>(nonPinnedPawms &
-                                             masks->NOT_RIGHT_COL) &
+        BitboardUtil::shift<masks->UP_RIGHT>(
+            nonPinnedPawms & masks->NOT_RIGHT_COL & ~masks->PROMO_RANK) &
         enemyPieces & targetSQs;
     const bitboard_t nonPinnedCaptureLeft =
-        BitboardUtil::shift<masks->UP_LEFT>(nonPinnedPawms &
-                                            masks->NOT_LEFT_COL) &
+        BitboardUtil::shift<masks->UP_LEFT>(
+            nonPinnedPawms & masks->NOT_LEFT_COL & ~masks->PROMO_RANK) &
         enemyPieces & targetSQs;
 
     for (bitboard_t captureRight = nonPinnedCaptureRight; captureRight != 0;
@@ -101,17 +99,47 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
       *moveList++ = Move::make(square + masks->DOWN_RIGHT, square);
     }
 
+    // Promotion capture
+    const bitboard_t promoNonPinnedPawns = nonPinnedPawms & masks->PROMO_RANK;
+    if (promoNonPinnedPawns)
+    {
+      const bitboard_t promoCaptureRight =
+          BitboardUtil::shift<masks->UP_RIGHT>(promoNonPinnedPawns &
+                                               masks->NOT_RIGHT_COL) &
+          enemyPieces & targetSQs;
+      const bitboard_t promoCaptureLeft =
+          BitboardUtil::shift<masks->UP_LEFT>(promoNonPinnedPawns &
+                                              masks->NOT_LEFT_COL) &
+          enemyPieces & targetSQs;
+
+      for (bitboard_t captureRight = promoCaptureRight; captureRight != 0;
+           captureRight &= captureRight - 1)
+      {
+        const square_t square = BitboardUtil::bitScan(captureRight);
+        moveList =
+            Move::makePromotions(square + masks->DOWN_LEFT, square, moveList);
+      }
+
+      for (bitboard_t captureLeft = promoCaptureLeft; captureLeft != 0;
+           captureLeft &= captureLeft - 1)
+      {
+        const square_t square = BitboardUtil::bitScan(captureLeft);
+        moveList =
+            Move::makePromotions(square + masks->DOWN_RIGHT, square, moveList);
+      }
+    }
+
     // Generate legal captures for pinned pawns
     if (pinnedPawns)
     {
       // Generate legal non pinned capture moves
       const bitboard_t pinnedCaptureRight =
-          BitboardUtil::shift<masks->UP_RIGHT>(pinnedPawns &
-                                               masks->NOT_RIGHT_COL) &
+          BitboardUtil::shift<masks->UP_RIGHT>(
+              pinnedPawns & masks->NOT_RIGHT_COL & ~masks->PROMO_RANK) &
           enemyPieces & targetSQs;
       const bitboard_t pinnedCaptureLeft =
-          BitboardUtil::shift<masks->UP_LEFT>(pinnedPawns &
-                                              masks->NOT_LEFT_COL) &
+          BitboardUtil::shift<masks->UP_LEFT>(
+              pinnedPawns & masks->NOT_LEFT_COL & ~masks->PROMO_RANK) &
           enemyPieces & targetSQs;
       const square_t kingSquare = pos.kingSquare<s>();
 
@@ -136,37 +164,71 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
           *moveList++ = Move::make(from, square);
         }
       }
+
+      // Promotion capture
+      const bitboard_t promoPinnedPawns = pinnedPawns & masks->PROMO_RANK;
+      if (promoPinnedPawns)
+      {
+        const bitboard_t promoCaptureRight =
+            BitboardUtil::shift<masks->UP_RIGHT>(promoPinnedPawns &
+                                                 masks->NOT_RIGHT_COL) &
+            enemyPieces & targetSQs;
+        const bitboard_t promoCaptureLeft =
+            BitboardUtil::shift<masks->UP_LEFT>(promoPinnedPawns &
+                                                masks->NOT_LEFT_COL) &
+            enemyPieces & targetSQs;
+
+        for (bitboard_t captureRight = promoCaptureRight; captureRight != 0;
+             captureRight &= captureRight - 1)
+        {
+          const square_t square = BitboardUtil::bitScan(captureRight);
+          const square_t from = square + masks->DOWN_LEFT;
+          if (RayConstants::RayBB[from][kingSquare] & BB(square))
+          {
+            moveList = Move::makePromotions(from, square, moveList);
+          }
+        }
+
+        for (bitboard_t captureLeft = promoCaptureLeft; captureLeft != 0;
+             captureLeft &= captureLeft - 1)
+        {
+          const square_t square = BitboardUtil::bitScan(captureLeft);
+          const square_t from = square + masks->DOWN_RIGHT;
+          if (RayConstants::RayBB[from][kingSquare] & BB(square))
+          {
+            moveList = Move::makePromotions(from, square, moveList);
+          }
+        }
+      }
     }
 
     const square_t epSquare = pos.st()->enPassant;
-    if (epSquare != SQ_NONE)
+    const bool isEpLegal = targetSQs & BB((epSquare + masks->DOWN));
+    if (epSquare != SQ_NONE && isEpLegal)
     {
       const bitboard_t epBB = BB(epSquare);
       const bitboard_t epCaptureRight =
-          BitboardUtil::shift<masks->DOWN_LEFT>(epBB & masks->NOT_RIGHT_COL) &
+          BitboardUtil::shift<masks->DOWN_LEFT>(epBB & masks->NOT_LEFT_COL) &
           pawns;
       const bitboard_t epCaptureLeft =
-          BitboardUtil::shift<masks->DOWN_RIGHT>(epBB & masks->NOT_LEFT_COL) &
+          BitboardUtil::shift<masks->DOWN_RIGHT>(epBB & masks->NOT_RIGHT_COL) &
           pawns;
 
-      const square_t kingSquare = pos.kingSquare<s>();
       const auto fromRight = static_cast<square_t>(epSquare + masks->DOWN_LEFT);
       const auto fromLeft = static_cast<square_t>(epSquare + masks->DOWN_RIGHT);
 
       if (epCaptureRight != 0 &&
           ((epCaptureRight & pinnedPawns) == 0 ||
-           (RayConstants::RayBB[fromRight][kingSquare] & epBB) != 0) &&
-          !pos.isSpecialEnPassantKingPin<s>(
-              kingSquare, epCaptureRight | epCaptureLeft, masks))
+           (RayConstants::RayBB[fromRight][pos.kingSquare<s>()] & epBB) != 0) &&
+          !pos.isSpecialEnPassantKingPin<s>(epCaptureRight, masks))
       {
         *moveList++ = Move::make<EN_PASSANT>(fromRight, epSquare);
       }
 
       if (epCaptureLeft != 0 &&
           ((epCaptureLeft & pinnedPawns) == 0 ||
-           (RayConstants::RayBB[fromRight][kingSquare] & epBB) != 0) &&
-          !pos.isSpecialEnPassantKingPin<s>(
-              kingSquare, epCaptureRight | epCaptureLeft, masks))
+           (RayConstants::RayBB[fromLeft][pos.kingSquare<s>()] & epBB) != 0) &&
+          !pos.isSpecialEnPassantKingPin<s>(epCaptureLeft, masks))
       {
         *moveList++ = Move::make<EN_PASSANT>(fromLeft, epSquare);
       }
@@ -181,7 +243,8 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
   // Generate one step pushes and double pushes
   // All legal single push moves
   const bitboard_t singlePush =
-      BitboardUtil::shift<masks->UP>(nonPinnedPawms) & ~allPieces;
+      BitboardUtil::shift<masks->UP>(nonPinnedPawms & ~masks->PROMO_RANK) &
+      ~allPieces;
   // All legal double push moves
   const bitboard_t doublePush =
       BitboardUtil::shift<masks->UP>(singlePush &
@@ -192,14 +255,27 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
        squares &= squares - 1)
   {
     const square_t square = BitboardUtil::bitScan(squares);
-    *moveList++ = Move::make(square + masks->DOWN, square);
+    *moveList++ = Move::make(square_t(square + masks->DOWN), square);
   }
 
   for (bitboard_t squares = doublePush; squares != 0; squares &= squares - 1)
   {
     const square_t square = BitboardUtil::bitScan(squares);
-    *moveList++ =
-        Move::make<DOUBLE_JUMP>(square + masks->DOWN + masks->DOWN, square);
+    *moveList++ = Move::make<DOUBLE_JUMP>(
+        square_t(square + masks->DOWN + masks->DOWN), square);
+  }
+
+  const bitboard_t promoPawns = nonPinnedPawms & masks->PROMO_RANK;
+  if (promoPawns)
+  {
+    const bitboard_t promoPush =
+        BitboardUtil::shift<masks->UP>(promoPawns) & ~allPieces & targetSQs;
+    for (bitboard_t squares = promoPush; squares != 0; squares &= squares - 1)
+    {
+      const square_t square = BitboardUtil::bitScan(squares);
+      moveList = Move::makePromotions(square_t(square + masks->DOWN), square,
+                                      moveList);
+    }
   }
 
   if (pinnedPawns)
@@ -210,8 +286,9 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
         BitboardUtil::shift<masks->UP>(pinnedPawns) & ~allPieces & targetSQs;
     // Pseudo legal double pushes (pawn might be pinned)
     const bitboard_t pinnedDoublePush =
-        BitboardUtil::shift<masks->UP>(pinnedSinglePush) & ~allPieces &
-        targetSQs;
+        BitboardUtil::shift<masks->UP>(pinnedSinglePush &
+                                       masks->POTENTIAL_DOUBLE_PUSHERS) &
+        ~allPieces & targetSQs;
     const square_t kingSquare = pos.kingSquare<s>();
 
     for (bitboard_t squares = pinnedSinglePush; squares != 0;
@@ -236,6 +313,24 @@ Move *generatePawnMoves(const Position &pos, Move *moveList,
             Move::make<DOUBLE_JUMP>(square + masks->DOWN + masks->DOWN, square);
       }
     }
+
+    const bitboard_t promoPinnedPawns = pinnedPawns & masks->PROMO_RANK;
+    if (promoPinnedPawns)
+    {
+      const bitboard_t promoPinnedPush =
+          BitboardUtil::shift<masks->UP>(promoPinnedPawns) & ~allPieces &
+          targetSQs;
+      for (bitboard_t squares = promoPinnedPush; squares != 0;
+           squares &= squares - 1)
+      {
+        const square_t square = BitboardUtil::bitScan(squares);
+        const square_t from = square + masks->DOWN;
+        if (RayConstants::RayBB[from][kingSquare] & BB(square))
+        {
+          moveList = Move::makePromotions(from, square, moveList);
+        }
+      }
+    }
   }
 
   return moveList;
@@ -255,7 +350,7 @@ template <MoveFilter filter, Side s>
 Move *generate(const Position &pos, Move *moveList)
 {
   // Constants
-  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
+  constexpr Side enemy = BitboardUtil::opposite<s>();
   constexpr BitboardUtil::Masks const *masks = BitboardUtil::bitboardMasks<s>();
 
   // Useful information for check detection and pin detection
@@ -330,15 +425,17 @@ Move *generate(const Position &pos, Move *moveList)
   // Castling king moves
   if (((masks->CASTLE_KING_PIECES & allPieces) == 0) &&
       (pos.castleRights<s>() & 1) &&
-      (pos.isSafeSquares(masks->CASTLE_KING_ATTACK_SQUARES, allPieces)))
+      (pos.isSafeSquares(masks->CASTLE_KING_ATTACK_SQUARES, allPieces,
+                         enemyPieces)))
   {
     *moveList++ = Move::make<CASTLE>(kingSquare, kingSquare + 2);
   }
 
   // Castling queen side
   if (((masks->CASTLE_QUEEN_PIECES & allPieces) == 0) &&
-      (pos.castleRights<s>() & 1) &&
-      (pos.isSafeSquares(masks->CASTLE_QUEEN_ATTACK_SQUARES, allPieces)))
+      (pos.castleRights<s>() & 2) &&
+      (pos.isSafeSquares(masks->CASTLE_QUEEN_ATTACK_SQUARES, allPieces,
+                         enemyPieces)))
   {
     *moveList++ = Move::make<CASTLE>(kingSquare, kingSquare - 2);
   }

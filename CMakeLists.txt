@@ -12,7 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 set(RELEASE_FLAGS "-march=native -std=c++20 -O3 -DSHALLOW_SEARCH")
-set(DEBUG_FLAGS "-g -march=native -DSHALLOW_SEARCH -fsanitize=thread")
+set(DEBUG_FLAGS "-g -march=native -std=c++20 -DSHALLOW_SEARCH")
 set(BASE_FLAGS "-fomit-frame-pointer -pipe -pedantic -pedantic-errors -Werror \
     -Wall -Wextra -Wshadow -Wdeprecated -Wdiv-by-zero -Wfloat-equal \
     -Wfloat-conversion -Wsign-compare -Wpointer-arith -Wuninitialized \
@@ -23,7 +23,7 @@ set(BASE_FLAGS "-fomit-frame-pointer -pipe -pedantic -pedantic-errors -Werror \
     -Wmissing-include-dirs")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BASE_FLAGS} ${DEBUG_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BASE_FLAGS} ${RELEASE_FLAGS}")
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")

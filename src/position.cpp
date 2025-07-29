@@ -62,7 +62,7 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   const FlagsV2 flags = move.getFlags();
 
   constexpr auto team = static_cast<index_t>(s);
-  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
+  constexpr Side enemy = BitboardUtil::opposite<s>();
 
   constexpr const BitboardUtil::Masks *masks = BitboardUtil::bitboardMasks<s>();
 
@@ -87,12 +87,6 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
 
   if (flags == NO_FLAG)
   {
-    if (captured != NO_PIECE)
-    {
-      m_st->capturedPiece = captured;
-      m_pieceBoards[captured] ^= toBB;
-      m_teamBoards[team ^ 1U] ^= toBB;
-    }
     if (move.isDoubleJump() && hasPawnsOnEpRank<enemy>())
     {
       m_st->enPassant = static_cast<square_t>(to + masks->DOWN);
@@ -103,36 +97,38 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
     if (toBB & masks->CASTLE_KING_PIECES)
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_KING_ROOK_FROM_TO;
+      m_teamBoards[team] ^= masks->CASTLE_KING_ROOK_FROM_TO;
       m_board[masks->CASTLE_KING_ROOK_SOURCE] = NO_PIECE;
       m_board[masks->CASTLE_KING_ROOK_DEST] = ROOK;
     }
     else
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
+      m_teamBoards[team] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
       m_board[masks->CASTLE_QUEEN_ROOK_SOURCE] = NO_PIECE;
       m_board[masks->CASTLE_QUEEN_ROOK_DEST] = ROOK;
     }
   }
   else if (flags == EN_PASSANT)
   {
-    const bitboard_t enemyPawnBB =
-        (s == Side::WHITE ? toBB << static_cast<index_t>(SOUTH)
-                          : toBB >> static_cast<index_t>(SOUTH));
+    const bitboard_t enemyPawnBB = BitboardUtil::shift<masks->DOWN>(toBB);
     m_pieceBoards[PAWN] ^= enemyPawnBB;
     m_teamBoards[team ^ 1U] ^= enemyPawnBB;
     m_board[to + masks->DOWN] = NO_PIECE;
   }
-  else if (flags == PROMOTION)
-  {
-    m_pieceBoards[PAWN] ^= toBB; // Remove pawn again
-    m_pieceBoards[KNIGHT + move.getPromo()] |= toBB;
+  else
+  { // Promotion
+    const auto promoPiece = static_cast<PieceType>(KNIGHT + move.getPromo());
+    m_pieceBoards[PAWN] ^= toBB; // Remove pawn
+    m_pieceBoards[promoPiece] ^= toBB;
+    m_board[to] = promoPiece;
+  }
 
-    if (captured != NO_PIECE)
-    {
-      m_st->capturedPiece = captured;
-      m_pieceBoards[captured] ^= toBB;
-      m_teamBoards[team ^ 1U] ^= toBB;
-    }
+  if (captured != NO_PIECE)
+  {
+    m_st->capturedPiece = captured;
+    m_pieceBoards[captured] ^= toBB;
+    m_teamBoards[team ^ 1U] ^= toBB;
   }
 
   m_st->castlingRights &= BitboardUtil::castlingModifiers[from];
@@ -153,6 +149,10 @@ template <Side s> void Position::doMove(Move move, StateInfo &newSt)
   // pos.st.hashKey = newHash;
 }
 
+/// @brief Takes back the move passed as argument.
+/// The move is assumed to be the last played move at this point.
+/// This function is called with the side that is currently to move,
+/// and therefor it is the opposite side move that is retracted.
 template <Side s> void Position::undoMove(Move move)
 {
   const square_t from = move.getFrom();
@@ -162,25 +162,26 @@ template <Side s> void Position::undoMove(Move move)
   const bitboard_t toBB = BB(to);
   const PieceType mover = m_board[to];
   const PieceType captured = m_st->capturedPiece;
+  constexpr auto movingTeam = BitboardUtil::opposite<s>();
+  constexpr auto teamIndex = static_cast<index_t>(movingTeam);
 
-  constexpr auto team = static_cast<index_t>(s) ^ 1U;
+  constexpr const BitboardUtil::Masks *masks =
+      BitboardUtil::bitboardMasks<movingTeam>();
 
-  constexpr const BitboardUtil::Masks *masks = BitboardUtil::bitboardMasks<s>();
-
-  m_teamBoards[team] ^= fromBB ^ toBB;
+  m_teamBoards[teamIndex] ^= fromBB ^ toBB;
   m_board[from] = mover;
   m_board[to] = NO_PIECE; // Will be overwritten if we have a capture
 
   if (mover == PieceType::KING)
   {
-    m_kings[team] = from;
+    m_kings[teamIndex] = from;
   }
   else
   {
     m_pieceBoards[mover] ^= fromBB ^ toBB;
   }
 
-  if (flags == NO_FLAG || flags == DOUBLE_JUMP)
+  if (flags == NO_FLAG || move.isDoubleJump())
   {
   }
   else if (flags == CASTLE)
@@ -188,31 +189,37 @@ template <Side s> void Position::undoMove(Move move)
     if (toBB & masks->CASTLE_KING_PIECES)
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_KING_ROOK_FROM_TO;
+      m_teamBoards[teamIndex] ^= masks->CASTLE_KING_ROOK_FROM_TO;
       m_board[masks->CASTLE_KING_ROOK_SOURCE] = ROOK;
       m_board[masks->CASTLE_KING_ROOK_DEST] = NO_PIECE;
     }
     else
     {
       m_pieceBoards[ROOK] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
+      m_teamBoards[teamIndex] ^= masks->CASTLE_QUEEN_ROOK_FROM_TO;
       m_board[masks->CASTLE_QUEEN_ROOK_SOURCE] = ROOK;
       m_board[masks->CASTLE_QUEEN_ROOK_DEST] = NO_PIECE;
     }
   }
   else if (flags == EN_PASSANT)
   {
-    m_pieceBoards[PAWN] ^= BB(m_st->enPassant);
-    m_teamBoards[team ^ 1U] ^= BB(m_st->enPassant);
-    m_board[to + masks->UP] = PAWN;
+    const bitboard_t realPawnBB = BB((to + masks->DOWN));
+    m_pieceBoards[PAWN] ^= realPawnBB;
+    m_teamBoards[teamIndex ^ 1U] ^= realPawnBB;
+    m_board[to + masks->DOWN] = PAWN;
   }
   else
-  {                                                  // Promotion
-    m_pieceBoards[KNIGHT + move.getPromo()] ^= toBB; // Remove promotion piece
+  { // Promotion
+    // Turn the moved piece back to a pawn
+    m_pieceBoards[KNIGHT + move.getPromo()] ^= fromBB;
+    m_pieceBoards[PAWN] ^= fromBB;
+    m_board[from] = PAWN;
   }
 
   if (captured != NO_PIECE)
   {
     m_board[to] = captured;
-    m_teamBoards[team ^ 1U] ^= toBB;
+    m_teamBoards[teamIndex ^ 1U] ^= toBB;
     m_pieceBoards[captured] ^= toBB;
   }
 
@@ -237,11 +244,13 @@ bitboard_t Position::attackOn(square_t square, bitboard_t board) const
          (MoveGen::attacks<KING>(0, square) & pieces<KING>());
 }
 
-bool Position::isSafeSquares(bitboard_t squaresToCheck, bitboard_t board) const
+bool Position::isSafeSquares(bitboard_t squaresToCheck, const bitboard_t board,
+                             const bitboard_t attackers) const
 {
   for (; squaresToCheck != 0; squaresToCheck &= squaresToCheck - 1)
   {
-    if (attackOn(BitboardUtil::bitScan(squaresToCheck), board) != 0UL)
+    if ((attackOn(BitboardUtil::bitScan(squaresToCheck), board) & attackers) !=
+        0UL)
     {
       return false;
     }
@@ -250,19 +259,18 @@ bool Position::isSafeSquares(bitboard_t squaresToCheck, bitboard_t board) const
 }
 
 template <Side s>
-bool Position::isSpecialEnPassantKingPin(const square_t kingSquare,
-                                         const bitboard_t epPawns,
+bool Position::isSpecialEnPassantKingPin(const bitboard_t epPawn,
                                          const BitboardUtil::Masks *masks) const
 {
-  constexpr index_t side = static_cast<index_t>(s);
-  constexpr Side enemy = static_cast<Side>(side ^ 1U);
+  constexpr Side enemy = BitboardUtil::opposite<s>();
+  const auto kingSq = kingSquare<s>();
   const bitboard_t realPawn =
       BB(static_cast<index_t>(m_st->enPassant + masks->DOWN));
   const bitboard_t snipers = pieces<enemy, ROOK, QUEEN>();
-  return (BB(kingSquare) & masks->EP_RANK) != 0 &&
+  return (BB(kingSq) & masks->EP_RANK) != 0 &&
          (snipers & masks->EP_RANK) != 0 &&
-         (MoveGen::attacks<ROOK>(pieces<ALL_PIECES>() & ~(epPawns | realPawn),
-                                 kingSquare) &
+         (MoveGen::attacks<ROOK>(pieces<ALL_PIECES>() & ~(epPawn | realPawn),
+                                 kingSq) &
           snipers) != 0;
 }
 
@@ -396,8 +404,6 @@ void Position::printState() const
 }
 
 template bool Position::isSpecialEnPassantKingPin<Side::WHITE>(
-    const square_t kingSquare, const bitboard_t epPawns,
-    const BitboardUtil::Masks *masks) const;
+    const bitboard_t epPawns, const BitboardUtil::Masks *masks) const;
 template bool Position::isSpecialEnPassantKingPin<Side::BLACK>(
-    const square_t kingSquare, const bitboard_t epPawns,
-    const BitboardUtil::Masks *masks) const;
+    const bitboard_t epPawns, const BitboardUtil::Masks *masks) const;

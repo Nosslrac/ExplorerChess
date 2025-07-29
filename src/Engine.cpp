@@ -46,7 +46,7 @@ bool validateMove(Move &pseudoLegalMove, const Position &pos)
       MoveGen::MoveList<MoveFilter::ALL>(pos).find(pseudoLegalMove);
   return pseudoLegalMove.getData() != 0;
 }
-
+/*
 void validateBitboard(const bitboard_t b1, const bitboard_t b2,
                       const std::string &name)
 {
@@ -91,6 +91,7 @@ bool moveIntegrity(const Position &pos1, const Position &pos2, Move move,
   }
   return result;
 }
+*/
 
 template <Side s> std::uint64_t bulkCount(Position &pos, int depth)
 {
@@ -102,26 +103,13 @@ template <Side s> std::uint64_t bulkCount(Position &pos, int depth)
   // StateInfo newSt;
   std::uint64_t count = 0;
   StateInfo newState;
-  constexpr Side enemy = s == Side::WHITE ? Side::BLACK : Side::WHITE;
+  constexpr Side enemy = BitboardUtil::opposite<s>();
 
   for (const auto &move : moveList)
   {
-    Position tmp;
-    std::memcpy(&tmp, &pos, sizeof(Position));
     pos.doMove<s>(move, newState);
-    auto part = bulkCount<enemy>(pos, depth - 1);
-    count += part;
-    if (part == BitboardUtil::All_SQ)
-    {
-      std::cout << TempGUI::makeMoveNotation(move) << ": " << part << "\n";
-      return BitboardUtil::All_SQ;
-    }
+    count += bulkCount<enemy>(pos, depth - 1);
     pos.undoMove<enemy>(move);
-    if (!moveIntegrity(tmp, pos, move, depth))
-    {
-      std::cout << TempGUI::makeMoveNotation(move) << ": Integrity failed\n";
-      return BitboardUtil::All_SQ;
-    }
   }
   return count;
 }
@@ -185,11 +173,6 @@ std::uint64_t Perft::perft(Position &pos, const int depth)
     auto part = leaf                  ? 1
                 : pos.isWhiteToMove() ? bulkCount<Side::WHITE>(pos, depth - 1)
                                       : bulkCount<Side::BLACK>(pos, depth - 1);
-    if (part == BitboardUtil::All_SQ)
-    {
-      std::cout << TempGUI::makeMoveNotation(move) << ": " << part << "\n";
-      exit(0);
-    }
     pos.undoMove(move);
     count += part;
     std::cout << TempGUI::makeMoveNotation(move) << ": " << part << "\n";

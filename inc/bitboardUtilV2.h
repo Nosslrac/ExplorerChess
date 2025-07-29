@@ -112,6 +112,7 @@ struct Masks final
   bitboard_t NOT_LEFT_COL;
   bitboard_t POTENTIAL_DOUBLE_PUSHERS;
   bitboard_t EP_RANK;
+  bitboard_t PROMO_RANK;
 
   // Side related
   index_t TEAM;
@@ -140,6 +141,7 @@ constexpr Masks WHITE_MASKS = {
     .NOT_LEFT_COL = ~FileA,
     .POTENTIAL_DOUBLE_PUSHERS = Rank6,
     .EP_RANK = Rank4,
+    .PROMO_RANK = Rank2,
     .TEAM = WHITE,
 };
 
@@ -166,12 +168,18 @@ constexpr Masks BLACK_MASKS = {
     .NOT_LEFT_COL = ~FileH,
     .POTENTIAL_DOUBLE_PUSHERS = Rank3,
     .EP_RANK = Rank5,
+    .PROMO_RANK = Rank7,
     .TEAM = BLACK,
 };
 
-template <Side s> inline constexpr const Masks *bitboardMasks()
+template <Side s> inline consteval const Masks *bitboardMasks()
 {
   return s == Side::WHITE ? &WHITE_MASKS : &BLACK_MASKS;
+}
+
+template <Side s> inline consteval Side opposite()
+{
+  return s == Side::WHITE ? Side::BLACK : Side::WHITE;
 }
 
 template <Direction D> inline constexpr bitboard_t shift(const bitboard_t bb)

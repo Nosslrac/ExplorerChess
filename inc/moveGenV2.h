@@ -46,6 +46,14 @@ public:
     return Move(move_t(to | (from << 6U) | (pt - KNIGHT) << 12U | flags));
   }
 
+  static constexpr Move* makePromotions(square_t from, square_t to, Move* moveList) {
+    *moveList++ = make<PROMOTION>(from, to, KNIGHT);
+    *moveList++ = make<PROMOTION>(from, to, BISHOP);
+    *moveList++ = make<PROMOTION>(from, to, ROOK);
+    *moveList++ = make<PROMOTION>(from, to, QUEEN);
+    return moveList;
+  }
+
 private:
   move_t move;
 };

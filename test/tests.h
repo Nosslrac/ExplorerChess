@@ -21,7 +21,11 @@ protected:
   // If the constructor and destructor are not enough for setting up
   // and cleaning up each test, you can define the following methods:
 
-  void SetUp() override { m_engine = std::make_unique<Engine>(); }
+  void SetUp() override
+  {
+    ATTACKS::init();
+    m_engine = std::make_unique<Engine>();
+  }
 
   void TearDown() override {}
 

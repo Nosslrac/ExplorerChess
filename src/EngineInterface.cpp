@@ -66,6 +66,7 @@ void EngineParser::runInterface()
 {
   std::cout << "Welcome to ExplorerChess v1.0\n";
   m_engine.initFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+
   while (true)
   {
     receiveInput();
