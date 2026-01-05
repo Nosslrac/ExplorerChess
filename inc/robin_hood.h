@@ -677,7 +677,7 @@ template <typename T1, typename T2> struct pair
   {}
 
   template <typename... U1, typename... U2>
-  // MSVC 2015 produces error "C2476: ‘constexpr’ constructor does not
+  // MSVC 2015 produces error "C2476: ï¿½constexprï¿½ constructor does not
   // initialize all members" if this constructor is constexpr
 #if !ROBIN_HOOD(BROKEN_CONSTEXPR)
   constexpr

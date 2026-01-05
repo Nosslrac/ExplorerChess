@@ -1,6 +1,7 @@
 #include "EngineInterface.h"
 #include "Engine.h"
-#include "moveGenV2.h"
+#include "GUI.h"
+#include "moveGen.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -57,7 +58,7 @@ inline void setPosition(const CommandArgs &args, Engine &engine)
 
 inline void makeMove(const CommandArgs &args, Engine &engine)
 {
-  engine.makeMove(TempGUI::parseMove(args.getArg()));
+  engine.makeMove(GUI::parseMove(args.getArg()));
 }
 
 inline void undoMove(Engine &engine) { engine.undoMove(); }

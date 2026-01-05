@@ -1,5 +1,5 @@
 #pragma once
-#include "bitboardUtilV2.h"
+#include "bitboardUtil.h"
 #include "types.h"
 
 namespace ATTACKS {

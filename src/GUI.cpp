@@ -1,87 +1,27 @@
 #include "GUI.h"
+#include "moveGen.h"
+#include <format>
+#include <iostream>
+#include <string_view>
 
 namespace GUI {
-void print_bit_board(bitboard_t b)
-{
-  std::string stb = "";
-  stb += "--------------------\n";
-  for (int i = 0; i < 8; i++)
-  {
-    stb += "| ";
-    for (int j = 0; j < 8; j++)
-    {
-      stb += (b & 1) == 1 ? "x " : "0 ";
-      b >>= 1;
-    }
-    stb += " |";
-    std::cout << stb;
-    std::cout << "\n";
-    stb = "";
-  }
-  std::cout << "--------------------\n\n";
-}
+namespace {
+constexpr std::string_view PieceIndexes(" PNBRQK pnbrqk");
+constexpr std::string_view CastlingIndexes("KQkq");
+constexpr std::string_view SideToMove("wb");
 
-// Prints the pices in a given position
-void print_pieces(const Position &pos)
-{
-  char pBoard[64];
-  fillPieceArray(pos, pBoard);
-  char rank = '8';
-  std::string stb;
-  stb += "\n +---+---+---+---+---+---+---+---+\n";
-  for (int i = 0; i < 8; i++)
-  {
-    for (int j = 0; j < 8; j++)
-    {
-      stb += " | ";
-      stb += pBoard[i * 8 + j];
-    }
-    stb += " | ";
-    stb += rank;
-    rank--;
-    std::cout << stb;
-    std::cout << "\n +---+---+---+---+---+---+---+---+\n";
-    stb = "";
-  }
-  std::cout << "   a   b   c   d   e   f   g   h\n\n";
-  getPositionFen(pos);
-  std::string checker = "";
-  GUI::getCheckers(checker, pos.st.checkers);
-  std::cout << "\nHash key: " << pos.st.hashKey << "\nChecker: " << checker
-            << "\n\n";
-}
-
-// Initiates a piece array for display in cmd
-void fillPieceArray(const Position &pos, char pBoard[])
-{
-  std::fill_n(pBoard, 64, ' ');
-  for (int i = 0; i < 10; i++)
-  {
-    bitboard_t pieces = pos.pieceBoards[i];
-    unsigned long sq;
-    while (pieces)
-    {
-      sq = bitScan(pieces);
-      pBoard[sq] = fenRepresentation[i];
-      pieces &= pieces - 1;
-    }
-  }
-  pBoard[pos.kings[0]] = 'K';
-  pBoard[pos.kings[1]] = 'k';
-}
+} // namespace
 
 // Returns the fen for the current position
 void getPositionFen(const Position &pos)
 {
-  char pBoard[64];
-  fillPieceArray(pos, pBoard);
-
   int empty = 0;
   std::string fen = "Fen: ";
 
-  for (std::size_t i = 0; i < BOARD_DIMMENSION * BOARD_DIMMENSION; i++)
+  for (std::size_t i = 0;
+       i < BitboardUtil::BOARD_DIMMENSION * BitboardUtil::BOARD_DIMMENSION; i++)
   {
-    if (i % BOARD_DIMMENSION == 0 && i != 0)
+    if (i % BitboardUtil::BOARD_DIMMENSION == 0 && i != 0)
     {
       if (empty != 0)
       {
@@ -90,7 +30,7 @@ void getPositionFen(const Position &pos)
       }
       fen += '/';
     }
-    if (pBoard[i] == ' ')
+    if (pos.pieceOn(square_t(i)) == NO_PIECE)
     {
       empty++;
     }
@@ -98,169 +38,76 @@ void getPositionFen(const Position &pos)
     {
       if (empty)
       {
-        fen += '0' + empty;
+        fen += static_cast<char>('0' + empty);
         empty = 0;
       }
-      fen += pBoard[i];
+      fen += PieceIndexes[pos.pieceOn(square_t(i))];
     }
   }
-  char info[25];
-  const char side = fenMove[!pos.whiteToMove];
-  char castle[4];
-  uint8_t legal = pos.st.castlingRights;
-  for (int i = 0; i < 4; i++)
-  {
-    castle[i] = (legal & 1) == 1 ? fenCastle[i] : '-';
-    legal >>= 1;
-  }
-  char ep[2] = {'-', 0};
+  const char side = SideToMove[pos.isWhiteToMove() ? 0 : 1];
+  std::string castle = getCastleRights(pos);
+  std::string enPassant = pos.st()->enPassant == SQ_NONE
+                              ? makeSquareNotation(pos.st()->enPassant)
+                              : "";
 
-  if (pos.st.enPassant != 0)
-  {
-    char file = 'a' + pos.st.enPassant % 8;
-    char rank = '0' + 8 - pos.st.enPassant / 8;
-    ep[0] = file;
-    ep[1] = rank;
-  }
-  printf(info, " %c %c%c%c%c %c%c 0 1", side, castle[0], castle[1], castle[2],
-         castle[3], ep[0], ep[1]);
-
-  std::cout << fen << info;
+  std::cout << fen << castle << side;
 }
 
-void parseMove(uint32_t move)
+square_t makeSquare(char col, char row)
 {
-  char from = getFrom(move);
-  char to = getTo(move);
-  const auto flags = static_cast<Flags>(getFlags(move));
-  char mover = getMover(move);
-
-  char capped = getCaptured(move);
-  std::string fString;
-  switch (flags)
-  {
-  case CAPTURE:
-    fString = "CAPTURE";
-    break;
-  case QUIET:
-    fString = "QUIET";
-    break;
-  case EP_CAPTURE:
-    fString = "EP_CAPTURE";
-    break;
-  case DOUBLE_PUSH:
-    fString = "DOUBLE_PUSH";
-    break;
-  case CASTLE_KING:
-    fString = "CASTLE_KING";
-    break;
-  case CASTLE_QUEEN:
-    fString = "CASTLE_QUEEN";
-    break;
-  default:
-    fString = "PROMO";
-    break;
-  }
-  char buff[100];
-  std::snprintf(buff, 100, "From: %d, To: %d, Mover: %d, Captured: %d, ", from,
-                to, mover, capped);
-  std::cout << buff << "Flags: " + fString << std::endl;
-
-  GUI::print_bit_board(BB(from) | BB(to));
+  return square_t(col - 'a' + (('8' - row) << 3U));
 }
 
-void printMove(uint32_t move)
+std::string getCastleRights(const Position &pos)
 {
-  std::string promo;
-  if ((move & PROMO_N) == PROMO_N)
+  std::string castle;
+  const auto castleRights = pos.st()->castlingRights;
+  for (std::size_t i = 0; i < 4; i++)
   {
-    switch (getPromo(move))
+    if (castleRights & BB(i))
     {
-    case 0:
-      promo = "n";
-      break;
-    case 1:
-      promo = "b";
-      break;
-    case 2:
-      promo = "r";
-      break;
-    default:
-      promo = "q";
-      break;
+      castle += CastlingIndexes[i];
     }
   }
-  int from = getFrom(move);
-  int to = getTo(move);
-  std::cout << static_cast<char>(from % BOARD_DIMMENSION + 'a')
-            << static_cast<char>('8' - from / BOARD_DIMMENSION)
-            << static_cast<char>('a' + to % BOARD_DIMMENSION)
-            << static_cast<char>('8' - to / BOARD_DIMMENSION) << promo;
+  return castle;
 }
 
-void printState(StateInfo &st)
+Move parseMove(std::string moveNotation)
 {
-  char buff[150];
-
-  printf(buff,
-         "Block: %llu, Pinned: %llu, Attack %llu, Checkers: %llu, Castle: "
-         "%d, Enpassant: %d",
-         st.blockForKing, st.pinnedMask, st.enemyAttack, st.checkers,
-         st.castlingRights, st.enPassant);
-  std::cout << buff << std::endl;
-}
-
-void getCheckers(std::string &checkerSQ, bitboard_t checkerBB)
-{
-  int square{};
-  while (checkerBB != 0u)
+  assert(moveNotation.length() <= 5 && moveNotation.length() >= 4);
+  const square_t from = makeSquare(moveNotation.at(0), moveNotation.at(1));
+  const square_t to = makeSquare(moveNotation.at(2), moveNotation.at(3));
+  if (moveNotation.length() == 5)
   {
-    square = bitScan(checkerBB);
-    checkerSQ += static_cast<char>(square % BOARD_DIMMENSION + 'a');
-    checkerSQ += static_cast<char>('8' - square / BOARD_DIMMENSION);
-    checkerSQ += ' ';
-    checkerBB &= checkerBB - 1;
-  }
-}
-
-uint32_t findMove(MoveList &ml, std::string move) noexcept
-{
-  int from = (move.at(0) - 'a') +
-             (BOARD_DIMMENSION - move.at(1) + '0') * BOARD_DIMMENSION;
-  int to = (move.at(2) - 'a') +
-           (BOARD_DIMMENSION - move.at(3) + '0') * BOARD_DIMMENSION;
-  uint8_t promo = 0;
-  bool skipPromo = true;
-  constexpr int promotionIndex = 5;
-
-  if (move.length() >= promotionIndex)
-  {
-    switch (move.at(4))
+    constexpr std::string_view promos = "nbrq";
+    if (auto id = promos.find(moveNotation.at(4)); id != std::string::npos)
     {
-    case 'b':
-      promo = 1;
-      break;
-    case 'r':
-      promo = 2;
-      break;
-    case 'q':
-      promo = 3;
-      break;
+      return Move::make<PROMOTION>(from, to, PieceType(id));
     }
-    skipPromo = false;
   }
-  for (std::size_t i = 0; i < ml.size(); ++i)
+  return Move::make(from, to);
+}
+
+std::string makeSquareNotation(square_t square)
+{
+  if (!BitboardUtil::isOnBoard(square) || square == SQ_NONE)
   {
-    const uint32_t curr = ml.moves[i];
-    if (getFrom(curr) == from && getTo(curr) == to)
-    {
-      if (skipPromo || getPromo(curr) == promo)
-      {
-        return curr;
-      }
-    }
+    return "-";
   }
-  return 0;
+  return std::string({static_cast<char>('a' + (square & 7U)),
+                      static_cast<char>('8' - (square >> 3U))});
+}
+
+std::string makeMoveNotation(Move move)
+{
+  square_t from = move.getFrom();
+  square_t to = move.getTo();
+  if (!BitboardUtil::isOnBoard(from) || !BitboardUtil::isOnBoard(to))
+  {
+    return "(invalid move)";
+  }
+  const int promo = move.isPromo() ? move.getPromo() + 1 : 0;
+  return makeSquareNotation(from) + makeSquareNotation(to) + " nbrq"[promo];
 }
 
 } // namespace GUI

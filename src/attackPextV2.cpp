@@ -5,7 +5,7 @@
 #include <cmath>
 #include <iostream>
 
-#include "bitboardUtilV2.h"
+#include "bitboardUtil.h"
 #include "types.h"
 
 namespace {

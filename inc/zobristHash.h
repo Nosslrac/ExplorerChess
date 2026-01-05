@@ -1,6 +1,6 @@
 #pragma once
 #include "bitboardUtil.h"
-
+/*
 class ZobristHash
 {
 public:
@@ -18,3 +18,4 @@ public:
 private:
   void initHash();
 };
+*/

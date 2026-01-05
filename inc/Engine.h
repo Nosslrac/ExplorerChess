@@ -1,5 +1,5 @@
 #pragma once
-#include "moveGenV2.h"
+#include "moveGen.h"
 #include "position.h"
 #include <deque>
 #include <memory>
@@ -7,7 +7,7 @@
 struct History final
 {
   constexpr explicit History(const Move m, const StateInfo &st)
-      : move(m), state(st){};
+      : move(m), state(st) {};
   Move move;
   StateInfo state;
 };

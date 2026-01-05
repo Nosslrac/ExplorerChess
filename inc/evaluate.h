@@ -5,7 +5,7 @@
 #include "moveGen.h"
 #include "robin_hood.h"
 #include "types.h"
-
+/*
 class Evaluation
 {
 public:
@@ -138,3 +138,4 @@ private:
   // MoveGen to look up attacks and moves
   MoveGen m_moveGen;
 };
+*/

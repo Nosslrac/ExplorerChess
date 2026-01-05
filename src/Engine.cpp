@@ -21,8 +21,9 @@
 // clang-format on
 
 #include "Engine.h"
-#include "bitboardUtilV2.h"
-#include "moveGenV2.h"
+#include "GUI.h"
+#include "bitboardUtil.h"
+#include "moveGen.h"
 #include "position.h"
 #include "types.h"
 
@@ -119,8 +120,8 @@ void Engine::makeMove(Move move)
 {
   if (validateMove(move, m_pos))
   {
-    std::cout << TempGUI::makeMoveNotation(move)
-              << " - Flags: " << move.getFlags() << "\n";
+    std::cout << GUI::makeMoveNotation(move) << " - Flags: " << move.getFlags()
+              << "\n";
     // Insert new History entry for the move to be made
     m_historyList->push_back(History(move, StateInfo()));
     m_pos.doMove(move, m_historyList->back().state);
@@ -175,7 +176,7 @@ std::uint64_t Perft::perft(Position &pos, const int depth)
                                       : bulkCount<Side::BLACK>(pos, depth - 1);
     pos.undoMove(move);
     count += part;
-    std::cout << TempGUI::makeMoveNotation(move) << ": " << part << "\n";
+    std::cout << GUI::makeMoveNotation(move) << ": " << part << "\n";
   }
 
   std::cout << "Total nodes visited: " << count << "\n";

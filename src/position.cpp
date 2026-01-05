@@ -1,6 +1,7 @@
 #include "position.h"
-#include "bitboardUtilV2.h"
-#include "moveGenV2.h"
+#include "GUI.h"
+#include "bitboardUtil.h"
+#include "moveGen.h"
 #include "types.h"
 
 #include <cctype>
@@ -343,7 +344,7 @@ void Position::fenInit(const std::string &fen, StateInfo &st)
   if ((stream >> epCol) && (epCol >= 'a' && epCol <= 'h') &&
       (stream >> epRow) && (m_whiteToMove ? '6' : '3') == epRow)
   {
-    m_st->enPassant = TempGUI::makeSquare(epCol, epRow);
+    m_st->enPassant = GUI::makeSquare(epCol, epRow);
   }
   if (m_st->enPassant == 0)
   {
@@ -377,14 +378,10 @@ void Position::printPieces(const std::string &fen) const
   std::cout << "   a   b   c   d   e   f   g   h\n\n";
   std::cout << "Fen: " << fen << "\n";
   std::cout << "Side to move: " << (m_whiteToMove ? "WHITE\n" : "BLACK\n");
-  std::cout << "Castling rights: "
-            << TempGUI::getCastleRights((m_st != nullptr) ? m_st->castlingRights
-                                                          : 0,
-                                        CastlingIndexes)
-            << "\n";
+  std::cout << "Castling rights: " << GUI::getCastleRights(*this) << "\n";
   std::cout << "En passant: "
-            << TempGUI::makeSquareNotation((m_st != nullptr) ? m_st->enPassant
-                                                             : SQ_NONE)
+            << GUI::makeSquareNotation((m_st != nullptr) ? m_st->enPassant
+                                                         : SQ_NONE)
             << std::endl;
   // GUI::getCheckers(checker, pos.st.checkers);
   // std::cout << "\nHash key: " << pos.st.hashKey << "\nChecker: " << checker

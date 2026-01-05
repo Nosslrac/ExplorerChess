@@ -1,6 +1,6 @@
 #include "evaluate.h"
 #include "types.h"
-
+/*
 Evaluation::Evaluation(const MoveGen &moveGen) : m_moveGen(moveGen) {}
 
 template <bool whiteToMove> int Evaluation::evaluate(const Position &pos) const
@@ -13,9 +13,6 @@ template <bool whiteToMove> int Evaluation::evaluate(const Position &pos) const
   return (pos.st.materialScore + pos.st.materialValue) * flip;
 }
 
-/**
- * NOTE: only call on initialization
- */
 score_t Evaluation::staticPieceEvaluation(const bitboard_t pieces[10]) const
 {
   int materialBalance = 0;
@@ -38,9 +35,6 @@ int Evaluation::undefendedPieces(const Position &pos) const
   return -5 * bitCount(minorNodefense);
 }
 
-/**
- * NOTE: only call on initialization
- */
 score_t Evaluation::initMaterialValue(const Position &pos) const
 {
   int whiteValue = 0;
@@ -126,3 +120,4 @@ int Evaluation::passedPawns(const bitboard_t piece[10]) const
 
 template int Evaluation::evaluate<true>(const Position &) const;
 template int Evaluation::evaluate<false>(const Position &) const;
+*/

@@ -1,344 +1,211 @@
 #pragma once
+
 #include "bitboardUtil.h"
 #include "types.h"
+#include <algorithm>
 
 #ifdef PEXT
-#include "attackPext.h"
+#include "attackPextV2.h"
 #else
 #include "attacks.h"
 #endif
 
-#ifdef PEXT
-class MoveGen : PEXT_ATTACK::PextAttack
+#include <array>
+#include <string>
+
+// clang-format off
+///
+/// @brief The structure of the move is as follows:
+/// bits 0-5: From square
+/// bits 6-11: To square
+/// bits 12-13: Promotion piece type if promotion, otherwise pawn double jump = 2
+/// bits 14-15: Special flags (quiet = 0, castling = 1, en passant = 2, promotion = 3)
+class Move final
 {
-#else
-class MoveGen : magicalBits::MagicalBitboards
-{
-#endif
 public:
-  MoveGen();
-  template <bool whiteToMove, bool onlyCapture>
-  bool generateAllMoves(const Position &pos, MoveList &move_list) const;
-
-  template <bool whiteToMove, bool castling, bool pins, bool onlyCapture>
-  void generateMoves(const Position &pos, MoveList &move_list) const;
-
-  template <bool whiteToMove, bool castling, bool onlyCapture>
-  void generateKingMoves(const Position &pos, MoveList &move_list) const;
-
-  template <bool whiteToMove, bool pins, bool onlyCapture>
-  void generatePawnMoves(const Position &pos, MoveList &move_list) const;
-
-  template <bool whiteToMove, bool pins, bool onlyCapture>
-  void generateKnightMoves(const Position &pos, MoveList &move_list) const;
-
-  template <bool whiteToMove, Piece p, bool pins, bool onlyCapture>
-  void generatePieceMoves(const Position &pos, MoveList &move_list) const;
-
-  // Move to private when working
-  template <Piece p> inline bitboard_t stepAttackBB(square_t square) const
-  {
-    static_assert(p == Knight || p == King);
-    if constexpr (p == Knight)
-    {
-      return knightLookUp[square];
-    }
-    if constexpr (p == King)
-    {
-      return kingLookUp[square];
-    }
+  constexpr explicit Move() : move(0) {}
+  constexpr explicit Move(move_t m) : move(m) {}
+  [[nodiscard]] constexpr Square getTo() const { return Square(move & 0x3FU); }
+  [[nodiscard]] constexpr Square getFrom() const { return Square((move >> 6U) & 0x3FU); }
+  [[nodiscard]] constexpr bool isDoubleJump() const { return (move >> 12U) == 2 && !isPromo(); }
+  [[nodiscard]] constexpr bool isPromo() const { return (move >> 14U) == 3; }
+  [[nodiscard]] constexpr FlagsV2 getFlags() const { return static_cast<FlagsV2>(move & 0xC000U); }
+  [[nodiscard]] constexpr index_t getPromo() const { return (move >> 12U) & 0x3U; }
+  [[nodiscard]] constexpr move_t getData() const { return move; }
+  [[nodiscard]] constexpr move_t getSquares() const { return move & 0xFFFU; }
+  bool operator==(const Move& lhs) const {
+    return lhs.getSquares() == getSquares();
   }
 
-  template <Piece p>
-  inline bitboard_t attackBB(const bitboard_t board,
-                             const square_t square) const
-  {
-    if constexpr (p == Bishop)
-    {
-      return bishopAttack(board, square);
-    }
-    if constexpr (p == Rook)
-    {
-      return rookAttack(board, square);
-    }
-    if constexpr (p == Queen)
-    {
-      return bishopAttack(board, square) | rookAttack(board, square);
-    }
+  static constexpr Move make(square_t from, square_t to) {
+    return Move(move_t(to | (from << 6U)));
   }
 
-  // Checks and pins
-  template <bool whiteToMove> void pinnedBoard(Position &pos);
+  template<FlagsV2 flags>
+  static constexpr Move make(square_t from, square_t to, PieceType pt = KNIGHT) {
+    return Move(move_t(to | (from << 6U) | (pt - KNIGHT) << 12U | flags));
+  }
 
-  template <bool whiteToMove> void checks(Position &pos);
-
-  template <bool whiteToMove>
-  bitboard_t findAttack(const Position &pos) const noexcept;
-
-  template <bool whiteToMove> void setCheckSquares(Position &pos) const;
-
-  bitboard_t attackersTo(uint8_t sq, const Position &pos) const;
+  static constexpr Move* makePromotions(square_t from, square_t to, Move* moveList) {
+    *moveList++ = make<PROMOTION>(from, to, KNIGHT);
+    *moveList++ = make<PROMOTION>(from, to, BISHOP);
+    *moveList++ = make<PROMOTION>(from, to, ROOK);
+    *moveList++ = make<PROMOTION>(from, to, QUEEN);
+    return moveList;
+  }
 
 private:
-  template <Piece p>
-  bitboard_t pieceAttack(bitboard_t board, bitboard_t pieces) const;
-  template <Piece p> bitboard_t stepAttack(bitboard_t pieces) const;
-
-  template <bool isPromotion>
-  inline void constructMove(MoveList &move_list, uint8_t from, uint8_t to,
-                            uint32_t flagAndPiece) const;
-
-  template <bool whiteToMove, bool pins>
-  void enPassantMoves(const Position &pos, MoveList &ml, uint8_t EP) const;
-
-  template <bool pin, bool isPromotion>
-  void makePawnMove(const Position &pos, MoveList &move_list, bitboard_t toSQs,
-                    int8_t back, uint32_t flagAndPiece) const;
-
-  template <bool whiteToMove, bool pin, bool isPromotion>
-  inline void makePawnCapture(const Position &pos, MoveList &move_list,
-                              bitboard_t toSQs, int8_t back,
-                              uint32_t flagAndPieces) const;
-
-  inline void makePieceMove(MoveList &move_list, bitboard_t toSQs, uint8_t back,
-                            uint32_t flagAndPiece) const;
-
-  template <bool whiteToMove>
-  inline void makeCaptureMove(const bitboard_t pieceBoards[],
-                              MoveList &move_list, bitboard_t toSQs,
-                              uint8_t back, uint32_t flagAndPiece) const;
-
-  //------------------Helper lookups------------------------------
-
-#ifdef PEXT
-  inline bitboard_t rookAttack(bitboard_t board, square_t square) const
-  {
-    return rookAttackPtr[square][pext(board, rookBits[square])];
-  }
-
-  inline bitboard_t bishopAttack(bitboard_t board, square_t square) const
-  {
-    return bishopAttackPtr[square][pext(board, bishopBits[square])];
-  }
-
-#else
-  inline bitboard_t bishopAttack(bitboard_t board, square_t square) const
-  {
-    board &= m_bishopMasks[square];
-    board *= m_bishopMagicBitboard[square];
-    board >>= (64 - m_occupacyCountBishop[square]);
-    return m_bishopAttacks[square][board];
-  }
-
-  inline bitboard_t rookAttack(bitboard_t board, square_t square) const
-  {
-    board &= m_rookMasks[square];
-    board *= m_rookMagicBitboard[square];
-    board >>= (64 - m_occupacyCountRook[square]);
-    return m_rookAttacks[square][board];
-  }
-#endif
-
-  template <bool white>
-  constexpr inline bitboard_t pawnAttackBB(bitboard_t squareBB) const
-  {
-    return shift<white, UP_LEFT>(squareBB) | shift<white, UP_RIGHT>(squareBB);
-  }
-
-  template <bool white>
-  constexpr inline bitboard_t getTeam(const Position &pos) const
-  {
-    if constexpr (white)
-    {
-      return pos.teamBoards[1];
-    }
-    return pos.teamBoards[2];
-  }
-
-  template <bool whiteToMove>
-  constexpr inline bitboard_t moveableSquares(const Position &pos) const
-  {
-    if constexpr (whiteToMove)
-    {
-      return ~pos.teamBoards[1];
-    }
-    return ~pos.teamBoards[2];
-  }
-
-  template <bool white>
-  constexpr inline bitboard_t getStraigthSliders(const Position &pos) const
-  {
-    if constexpr (white)
-    {
-      return pos.pieceBoards[3] | pos.pieceBoards[4];
-    }
-    else
-    {
-      return pos.pieceBoards[8] | pos.pieceBoards[9];
-    }
-  }
-
-  template <bool white, Piece p>
-  constexpr inline bitboard_t getPieces(const Position &pos) const
-  {
-    if constexpr (white)
-    {
-      return pos.pieceBoards[p];
-    }
-    else
-    {
-      return pos.pieceBoards[p + 5];
-    }
-  }
-
-  template <Piece p> inline bitboard_t emptyAttack(uint8_t sq) const
-  {
-    if constexpr (p == Bishop)
-    {
-      return attackBB<Bishop>(0, sq);
-    }
-    if constexpr (p == Rook)
-    {
-      return attackBB<Rook>(0, sq);
-    }
-  }
-
-  inline bitboard_t betweenBB(uint8_t sq1, uint8_t sq2) const
-  {
-    bitboard_t b = LineBB[sq1][sq2] & ((All_SQ << sq1) ^ (All_SQ << sq2));
-    return b & (b - 1); // exclude lsb
-  }
-
-  // Lookups for knight and king
-  static constexpr bitboard_t kingLookUp[64] = {770ULL,
-                                                1797ULL,
-                                                3594ULL,
-                                                7188ULL,
-                                                14376ULL,
-                                                28752ULL,
-                                                57504ULL,
-                                                49216ULL,
-                                                197123ULL,
-                                                460039ULL,
-                                                920078ULL,
-                                                1840156ULL,
-                                                3680312ULL,
-                                                7360624ULL,
-                                                14721248ULL,
-                                                12599488ULL,
-                                                50463488ULL,
-                                                117769984ULL,
-                                                235539968ULL,
-                                                471079936ULL,
-                                                942159872ULL,
-                                                1884319744ULL,
-                                                3768639488ULL,
-                                                3225468928ULL,
-                                                12918652928ULL,
-                                                30149115904ULL,
-                                                60298231808ULL,
-                                                120596463616ULL,
-                                                241192927232ULL,
-                                                482385854464ULL,
-                                                964771708928ULL,
-                                                825720045568ULL,
-                                                3307175149568ULL,
-                                                7718173671424ULL,
-                                                15436347342848ULL,
-                                                30872694685696ULL,
-                                                61745389371392ULL,
-                                                123490778742784ULL,
-                                                246981557485568ULL,
-                                                211384331665408ULL,
-                                                846636838289408ULL,
-                                                1975852459884544ULL,
-                                                3951704919769088ULL,
-                                                7903409839538176ULL,
-                                                15806819679076352ULL,
-                                                31613639358152704ULL,
-                                                63227278716305408ULL,
-                                                54114388906344448ULL,
-                                                216739030602088448ULL,
-                                                505818229730443264ULL,
-                                                1011636459460886528ULL,
-                                                2023272918921773056ULL,
-                                                4046545837843546112ULL,
-                                                8093091675687092224ULL,
-                                                16186183351374184448ULL,
-                                                13853283560024178688ULL,
-                                                144959613005987840ULL,
-                                                362258295026614272ULL,
-                                                724516590053228544ULL,
-                                                1449033180106457088ULL,
-                                                2898066360212914176ULL,
-                                                5796132720425828352ULL,
-                                                11592265440851656704ULL,
-                                                4665729213955833856ULL};
-
-  static constexpr bitboard_t knightLookUp[64] = {132096ULL,
-                                                  329728ULL,
-                                                  659712ULL,
-                                                  1319424ULL,
-                                                  2638848ULL,
-                                                  5277696ULL,
-                                                  10489856ULL,
-                                                  4202496ULL,
-                                                  33816580ULL,
-                                                  84410376ULL,
-                                                  168886289ULL,
-                                                  337772578ULL,
-                                                  675545156ULL,
-                                                  1351090312ULL,
-                                                  2685403152ULL,
-                                                  1075839008ULL,
-                                                  8657044482ULL,
-                                                  21609056261ULL,
-                                                  43234889994ULL,
-                                                  86469779988ULL,
-                                                  172939559976ULL,
-                                                  345879119952ULL,
-                                                  687463207072ULL,
-                                                  275414786112ULL,
-                                                  2216203387392ULL,
-                                                  5531918402816ULL,
-                                                  11068131838464ULL,
-                                                  22136263676928ULL,
-                                                  44272527353856ULL,
-                                                  88545054707712ULL,
-                                                  175990581010432ULL,
-                                                  70506185244672ULL,
-                                                  567348067172352ULL,
-                                                  1416171111120896ULL,
-                                                  2833441750646784ULL,
-                                                  5666883501293568ULL,
-                                                  11333767002587136ULL,
-                                                  22667534005174272ULL,
-                                                  45053588738670592ULL,
-                                                  18049583422636032ULL,
-                                                  145241105196122112ULL,
-                                                  362539804446949376ULL,
-                                                  725361088165576704ULL,
-                                                  1450722176331153408ULL,
-                                                  2901444352662306816ULL,
-                                                  5802888705324613632ULL,
-                                                  11533718717099671552ULL,
-                                                  4620693356194824192ULL,
-                                                  288234782788157440ULL,
-                                                  576469569871282176ULL,
-                                                  1224997833292120064ULL,
-                                                  2449995666584240128ULL,
-                                                  4899991333168480256ULL,
-                                                  9799982666336960512ULL,
-                                                  1152939783987658752ULL,
-                                                  2305878468463689728ULL,
-                                                  1128098930098176ULL,
-                                                  2257297371824128ULL,
-                                                  4796069720358912ULL,
-                                                  9592139440717824ULL,
-                                                  19184278881435648ULL,
-                                                  38368557762871296ULL,
-                                                  4679521487814656ULL,
-                                                  9077567998918656ULL};
-
-  bitboard_t LineBB[64][64] = {};
+  move_t move;
 };
+// clang-format on
+
+enum class MoveFilter : std::uint8_t
+{
+  ALL,
+  QUIETS,
+  CAPTURES,
+  CHECK_EVASIONS
+};
+
+class Position;
+
+namespace MoveGen {
+/// @brief Generate the possible moves
+template <MoveFilter filter>
+Move *generate(const Position &pos, Move *moveList);
+template <MoveFilter filter, Side s>
+Move *generate(const Position &pos, Move *moveList);
+
+/// @brief Gives the attack bitboard for a piece given
+/// the occupancy and start square
+template <PieceType p>
+bitboard_t attacks(bitboard_t occupancy, square_t square);
+template <Side s, PieceType p>
+bitboard_t attacks(bitboard_t occupancy, square_t square);
+
+template <MoveFilter filter, Side... s> struct MoveList final
+{
+  explicit MoveList(const Position &pos)
+      : last(generate<filter, s...>(pos, moves)) {};
+  constexpr void add(move_t move) { *last++ = Move(move); }
+  const Move *begin() const { return moves; }
+  Move *start() { return moves; }
+  const Move *end() const { return last; }
+  constexpr index_t size() const { return last - moves; }
+  Move find(const Move move) const
+  {
+    if (auto it = std::find(begin(), end(), move); it != end())
+    {
+      return *it;
+    }
+    return Move();
+  }
+
+private:
+  Move moves[BitboardUtil::MAX_MOVES];
+  Move *last;
+};
+
+} // namespace MoveGen
+
+namespace PseudoAttacks {
+constexpr bitboard_t KnightAttacks[SQ_COUNT] = {
+    0x0000000000020400UL, 0x0000000000050800UL, 0x00000000000a1100UL,
+    0x0000000000142200UL, 0x0000000000284400UL, 0x0000000000508800UL,
+    0x0000000000a01000UL, 0x0000000000402000UL, 0x0000000002040004UL,
+    0x0000000005080008UL, 0x000000000a110011UL, 0x0000000014220022UL,
+    0x0000000028440044UL, 0x0000000050880088UL, 0x00000000a0100010UL,
+    0x0000000040200020UL, 0x0000000204000402UL, 0x0000000508000805UL,
+    0x0000000a1100110aUL, 0x0000001422002214UL, 0x0000002844004428UL,
+    0x0000005088008850UL, 0x000000a0100010a0UL, 0x0000004020002040UL,
+    0x0000020400040200UL, 0x0000050800080500UL, 0x00000a1100110a00UL,
+    0x0000142200221400UL, 0x0000284400442800UL, 0x0000508800885000UL,
+    0x0000a0100010a000UL, 0x0000402000204000UL, 0x0002040004020000UL,
+    0x0005080008050000UL, 0x000a1100110a0000UL, 0x0014220022140000UL,
+    0x0028440044280000UL, 0x0050880088500000UL, 0x00a0100010a00000UL,
+    0x0040200020400000UL, 0x0204000402000000UL, 0x0508000805000000UL,
+    0x0a1100110a000000UL, 0x1422002214000000UL, 0x2844004428000000UL,
+    0x5088008850000000UL, 0xa0100010a0000000UL, 0x4020002040000000UL,
+    0x0400040200000000UL, 0x0800080500000000UL, 0x1100110a00000000UL,
+    0x2200221400000000UL, 0x4400442800000000UL, 0x8800885000000000UL,
+    0x100010a000000000UL, 0x2000204000000000UL, 0x0004020000000000UL,
+    0x0008050000000000UL, 0x00110a0000000000UL, 0x0022140000000000UL,
+    0x0044280000000000UL, 0x0088500000000000UL, 0x0010a00000000000UL,
+    0x0020400000000000UL};
+
+constexpr bitboard_t KingAttacks[SQ_COUNT] = {
+    0x0000000000000302UL, 0x0000000000000705UL, 0x0000000000000e0aUL,
+    0x0000000000001c14UL, 0x0000000000003828UL, 0x0000000000007050UL,
+    0x000000000000e0a0UL, 0x000000000000c040UL, 0x0000000000030203UL,
+    0x0000000000070507UL, 0x00000000000e0a0eUL, 0x00000000001c141cUL,
+    0x0000000000382838UL, 0x0000000000705070UL, 0x0000000000e0a0e0UL,
+    0x0000000000c040c0UL, 0x0000000003020300UL, 0x0000000007050700UL,
+    0x000000000e0a0e00UL, 0x000000001c141c00UL, 0x0000000038283800UL,
+    0x0000000070507000UL, 0x00000000e0a0e000UL, 0x00000000c040c000UL,
+    0x0000000302030000UL, 0x0000000705070000UL, 0x0000000e0a0e0000UL,
+    0x0000001c141c0000UL, 0x0000003828380000UL, 0x0000007050700000UL,
+    0x000000e0a0e00000UL, 0x000000c040c00000UL, 0x0000030203000000UL,
+    0x0000070507000000UL, 0x00000e0a0e000000UL, 0x00001c141c000000UL,
+    0x0000382838000000UL, 0x0000705070000000UL, 0x0000e0a0e0000000UL,
+    0x0000c040c0000000UL, 0x0003020300000000UL, 0x0007050700000000UL,
+    0x000e0a0e00000000UL, 0x001c141c00000000UL, 0x0038283800000000UL,
+    0x0070507000000000UL, 0x00e0a0e000000000UL, 0x00c040c000000000UL,
+    0x0302030000000000UL, 0x0705070000000000UL, 0x0e0a0e0000000000UL,
+    0x1c141c0000000000UL, 0x3828380000000000UL, 0x7050700000000000UL,
+    0xe0a0e00000000000UL, 0xc040c00000000000UL, 0x0203000000000000UL,
+    0x0507000000000000UL, 0x0a0e000000000000UL, 0x141c000000000000UL,
+    0x2838000000000000UL, 0x5070000000000000UL, 0xa0e0000000000000UL,
+    0x40c0000000000000UL};
+
+constexpr bitboard_t PawnAttacks[2][SQ_COUNT] = {
+    {0x0000000000000000UL, 0x0000000000000000UL, 0x0000000000000000UL,
+     0x0000000000000000UL, 0x0000000000000000UL, 0x0000000000000000UL,
+     0x0000000000000000UL, 0x0000000000000000UL, 0x0000000000000002UL,
+     0x0000000000000005UL, 0x000000000000000aUL, 0x0000000000000014UL,
+     0x0000000000000028UL, 0x0000000000000050UL, 0x00000000000000a0UL,
+     0x0000000000000040UL, 0x0000000000000200UL, 0x0000000000000500UL,
+     0x0000000000000a00UL, 0x0000000000001400UL, 0x0000000000002800UL,
+     0x0000000000005000UL, 0x000000000000a000UL, 0x0000000000004000UL,
+     0x0000000000020000UL, 0x0000000000050000UL, 0x00000000000a0000UL,
+     0x0000000000140000UL, 0x0000000000280000UL, 0x0000000000500000UL,
+     0x0000000000a00000UL, 0x0000000000400000UL, 0x0000000002000000UL,
+     0x0000000005000000UL, 0x000000000a000000UL, 0x0000000014000000UL,
+     0x0000000028000000UL, 0x0000000050000000UL, 0x00000000a0000000UL,
+     0x0000000040000000UL, 0x0000000200000000UL, 0x0000000500000000UL,
+     0x0000000a00000000UL, 0x0000001400000000UL, 0x0000002800000000UL,
+     0x0000005000000000UL, 0x000000a000000000UL, 0x0000004000000000UL,
+     0x0000020000000000UL, 0x0000050000000000UL, 0x00000a0000000000UL,
+     0x0000140000000000UL, 0x0000280000000000UL, 0x0000500000000000UL,
+     0x0000a00000000000UL, 0x0000400000000000UL, 0x0002000000000000UL,
+     0x0005000000000000UL, 0x000a000000000000UL, 0x0014000000000000UL,
+     0x0028000000000000UL, 0x0050000000000000UL, 0x00a0000000000000UL,
+     0x0040000000000000UL},
+    {0x0000000000000200UL, 0x0000000000000500UL, 0x0000000000000a00UL,
+     0x0000000000001400UL, 0x0000000000002800UL, 0x0000000000005000UL,
+     0x000000000000a000UL, 0x0000000000004000UL, 0x0000000000020000UL,
+     0x0000000000050000UL, 0x00000000000a0000UL, 0x0000000000140000UL,
+     0x0000000000280000UL, 0x0000000000500000UL, 0x0000000000a00000UL,
+     0x0000000000400000UL, 0x0000000002000000UL, 0x0000000005000000UL,
+     0x000000000a000000UL, 0x0000000014000000UL, 0x0000000028000000UL,
+     0x0000000050000000UL, 0x00000000a0000000UL, 0x0000000040000000UL,
+     0x0000000200000000UL, 0x0000000500000000UL, 0x0000000a00000000UL,
+     0x0000001400000000UL, 0x0000002800000000UL, 0x0000005000000000UL,
+     0x000000a000000000UL, 0x0000004000000000UL, 0x0000020000000000UL,
+     0x0000050000000000UL, 0x00000a0000000000UL, 0x0000140000000000UL,
+     0x0000280000000000UL, 0x0000500000000000UL, 0x0000a00000000000UL,
+     0x0000400000000000UL, 0x0002000000000000UL, 0x0005000000000000UL,
+     0x000a000000000000UL, 0x0014000000000000UL, 0x0028000000000000UL,
+     0x0050000000000000UL, 0x00a0000000000000UL, 0x0040000000000000UL,
+     0x0200000000000000UL, 0x0500000000000000UL, 0x0a00000000000000UL,
+     0x1400000000000000UL, 0x2800000000000000UL, 0x5000000000000000UL,
+     0xa000000000000000UL, 0x4000000000000000UL, 0x0000000000000000UL,
+     0x0000000000000000UL, 0x0000000000000000UL, 0x0000000000000000UL,
+     0x0000000000000000UL, 0x0000000000000000UL, 0x0000000000000000UL,
+     0x0000000000000000UL}};
+
+void print_bit_board(bitboard_t b);
+void printMove(Move move);
+void printMoves(square_t from, bitboard_t toSQs);
+void printMovelistMoves(Move *move);
+
+} // namespace PseudoAttacks

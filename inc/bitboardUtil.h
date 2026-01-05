@@ -1,5 +1,5 @@
 #pragma once
-#include <immintrin.h>
+#include <cassert>
 
 #include <cstdint>
 #include <cstring>
@@ -10,31 +10,27 @@
 #define PEXT
 #endif
 
-#define getTo(move) (move & 0xFFU)
-#define getFrom(move) ((move >> 8U) & 0xFFU)
-#define getFlags(move) (move & 0xFF0000U)
-#define getMover(move) ((move >> 24U) & 0xFU)
-#define getCaptured(move) (move >> 28U)
-#define getPromo(move) ((move >> 16U) & 0x3U)
-#define BB(i) (1ULL << i)
+// #define getTo(move) (move & 0xFFU)
+// #define getFrom(move) ((move >> 8U) & 0xFFU)
+// #define getFlags(move) (move & 0xFF0000U)
+// #define getMover(move) ((move >> 24U) & 0xFU)
+// #define getCaptured(move) (move >> 28U)
+// #define getPromo(move) ((move >> 16U) & 0x3U)
+#define BB(i) (1UL << i)
 
-enum Piece
+enum Direction : std::int8_t
 {
-  King = 10,
-  Pawn = 0,
-  Knight = 1,
-  Bishop = 2,
-  Rook = 3,
-  Queen = 4,
+  NORTH = -8,
+  SOUTH = -NORTH,
+  WEST = -1,
+  EAST = -WEST,
+  NORTH_WEST = -9,
+  NORTH_EAST = -7,
+  SOUTH_WEST = -NORTH_EAST,
+  SOUTH_EAST = -NORTH_WEST,
 };
 
-enum Direction
-{
-  UP,
-  DOWN,
-  UP_LEFT,
-  UP_RIGHT
-};
+namespace BitboardUtil {
 
 constexpr bitboard_t FileA = 0x0101010101010101ULL;
 constexpr bitboard_t FileB = FileA << 1U;
@@ -57,9 +53,11 @@ constexpr bitboard_t Rank8 = Rank1 << (8 * 7U);
 //---------- Usful constants------------------------
 constexpr uint8_t NoEP = 0;
 constexpr bitboard_t All_SQ = ~0ULL;
+constexpr bitboard_t NOT_EDGE =
+    (Rank2 | Rank3 | Rank4 | Rank5 | Rank6 | Rank7) & ~FileA & ~FileH;
 constexpr int CHECK_MATE = -0xFFFF;
-constexpr int BLACK = 5;
-constexpr int WHITE = 0;
+constexpr index_t BLACK = 1;
+constexpr index_t WHITE = 0;
 constexpr int BOARD_DIMMENSION = 8;
 constexpr std::size_t MAX_MOVES = 100;
 
@@ -67,8 +65,13 @@ constexpr std::size_t MAX_MOVES = 100;
 
 constexpr bitboard_t WHITE_QUEEN_PIECES = BB(59U) | BB(58U) | BB(57U);
 constexpr bitboard_t WHITE_KING_PIECES = BB(61U) | BB(62U);
+constexpr bitboard_t WHITE_KING_ROOK_FROM_TO = BB(63U) | BB(61U);
+constexpr bitboard_t WHITE_QUEEN_ROOK_FROM_TO = BB(56U) | BB(59U);
+
 constexpr bitboard_t BLACK_QUEEN_PIECES = BB(1U) | BB(2U) | BB(3U);
 constexpr bitboard_t BLACK_KING_PIECES = BB(6U) | BB(5U);
+constexpr bitboard_t BLACK_KING_ROOK_FROM_TO = BB(7U) | BB(5U);
+constexpr bitboard_t BLACK_QUEEN_ROOK_FROM_TO = BB(0U) | BB(3U);
 
 // Attacked squares differ from occupied on queenside, also add king square
 // since king can't be in check
@@ -79,57 +82,109 @@ constexpr bitboard_t BLACK_ATTACK_QUEEN = BLACK_QUEEN_PIECES ^ BB(1U) ^ BB(4U);
 constexpr bitboard_t WHITE_ATTACK_KING = WHITE_KING_PIECES ^ BB(60U);
 constexpr bitboard_t BLACK_ATTACK_KING = BLACK_KING_PIECES ^ BB(4U);
 
-// TODO: implement 50 move rule
-struct StateInfo
+struct Masks final
 {
-  bitboard_t blockForKing;
-  bitboard_t pinnedMask;
-  bitboard_t enemyAttack;
-  bitboard_t checkers;
+  // Castling related
+  bitboard_t CASTLE_KING_PIECES;
+  bitboard_t CASTLE_QUEEN_PIECES;
+  bitboard_t CASTLE_KING_ATTACK_SQUARES;
+  bitboard_t CASTLE_QUEEN_ATTACK_SQUARES;
+  bitboard_t CASTLE_KING_ROOK_FROM_TO;
+  bitboard_t CASTLE_QUEEN_ROOK_FROM_TO;
+  square_t CASTLE_KING_ROOK_SOURCE;
+  square_t CASTLE_KING_ROOK_DEST;
+  square_t CASTLE_QUEEN_ROOK_SOURCE;
+  square_t CASTLE_QUEEN_ROOK_DEST;
 
-  // uint8_t numCheckers;
-  uint8_t castlingRights;
-  uint8_t enPassant;
+  // Directions
+  Direction UP;
+  Direction UP_RIGHT;
+  Direction UP_LEFT;
+  Direction DOWN;
+  Direction DOWN_RIGHT;
+  Direction DOWN_LEFT;
+  Direction LEFT;
+  Direction RIGHT;
 
-  // Incremental
-  bitboard_t hashKey;
-  score_t materialScore;
-  score_t materialValue;
+  // Bitboards for masking
+  bitboard_t NOT_RIGHT_COL;
+  bitboard_t NOT_LEFT_COL;
+  bitboard_t POTENTIAL_DOUBLE_PUSHERS;
+  bitboard_t EP_RANK;
+  bitboard_t PROMO_RANK;
+
+  // Side related
+  index_t TEAM;
 };
 
-// Inherits irreversible info from StateInfo
-struct Position
-{
-  StateInfo st;
-  square_t kings[2];
-  bitboard_t pieceBoards[10];
-  bitboard_t teamBoards[3];
-
-  // Check boards
-  bitboard_t checkSquares[4];
-
-  bool whiteToMove;
-  uint16_t ply;
-  bool operator==(const Position &pos) const
-  {
-    return memcmp(this, &pos, sizeof(Position)) == 0;
-  }
+constexpr Masks WHITE_MASKS = {
+    .CASTLE_KING_PIECES = WHITE_KING_PIECES,
+    .CASTLE_QUEEN_PIECES = WHITE_QUEEN_PIECES,
+    .CASTLE_KING_ATTACK_SQUARES = WHITE_ATTACK_KING,
+    .CASTLE_QUEEN_ATTACK_SQUARES = WHITE_ATTACK_QUEEN,
+    .CASTLE_KING_ROOK_FROM_TO = WHITE_KING_ROOK_FROM_TO,
+    .CASTLE_QUEEN_ROOK_FROM_TO = WHITE_QUEEN_ROOK_FROM_TO,
+    .CASTLE_KING_ROOK_SOURCE = 63,
+    .CASTLE_KING_ROOK_DEST = 61,
+    .CASTLE_QUEEN_ROOK_SOURCE = 56,
+    .CASTLE_QUEEN_ROOK_DEST = 59,
+    .UP = NORTH,
+    .UP_RIGHT = NORTH_EAST,
+    .UP_LEFT = NORTH_WEST,
+    .DOWN = SOUTH,
+    .DOWN_RIGHT = SOUTH_EAST,
+    .DOWN_LEFT = SOUTH_WEST,
+    .LEFT = WEST,
+    .RIGHT = EAST,
+    .NOT_RIGHT_COL = ~FileH,
+    .NOT_LEFT_COL = ~FileA,
+    .POTENTIAL_DOUBLE_PUSHERS = Rank6,
+    .EP_RANK = Rank4,
+    .PROMO_RANK = Rank2,
+    .TEAM = WHITE,
 };
 
-struct MoveList
-{
-  move_t moves[100] = {};
-  uint8_t curr = 0;
-  inline void add(uint32_t move) { moves[curr++] = move; }
-  inline uint8_t size() const { return curr; }
+constexpr Masks BLACK_MASKS = {
+    .CASTLE_KING_PIECES = BLACK_KING_PIECES,
+    .CASTLE_QUEEN_PIECES = BLACK_QUEEN_PIECES,
+    .CASTLE_KING_ATTACK_SQUARES = BLACK_ATTACK_KING,
+    .CASTLE_QUEEN_ATTACK_SQUARES = BLACK_ATTACK_QUEEN,
+    .CASTLE_KING_ROOK_FROM_TO = BLACK_KING_ROOK_FROM_TO,
+    .CASTLE_QUEEN_ROOK_FROM_TO = BLACK_QUEEN_ROOK_FROM_TO,
+    .CASTLE_KING_ROOK_SOURCE = 7,
+    .CASTLE_KING_ROOK_DEST = 5,
+    .CASTLE_QUEEN_ROOK_SOURCE = 0,
+    .CASTLE_QUEEN_ROOK_DEST = 3,
+    .UP = SOUTH,
+    .UP_RIGHT = SOUTH_WEST,
+    .UP_LEFT = SOUTH_EAST,
+    .DOWN = NORTH,
+    .DOWN_RIGHT = NORTH_WEST,
+    .DOWN_LEFT = NORTH_EAST,
+    .LEFT = EAST,
+    .RIGHT = WEST,
+    .NOT_RIGHT_COL = ~FileA,
+    .NOT_LEFT_COL = ~FileH,
+    .POTENTIAL_DOUBLE_PUSHERS = Rank3,
+    .EP_RANK = Rank5,
+    .PROMO_RANK = Rank7,
+    .TEAM = BLACK,
 };
 
-struct Move
+template <Side s> inline consteval const Masks *bitboardMasks()
 {
-  int eval;
-  uint32_t move;
-  bool operator<(const Move &other) const { return other.eval < eval; }
-};
+  return s == Side::WHITE ? &WHITE_MASKS : &BLACK_MASKS;
+}
+
+template <Side s> inline consteval Side opposite()
+{
+  return s == Side::WHITE ? Side::BLACK : Side::WHITE;
+}
+
+template <Direction D> inline constexpr bitboard_t shift(const bitboard_t bb)
+{
+  return D >= 0 ? bb << D : bb >> -D;
+}
 
 inline int pext(bitboard_t BB, bitboard_t mask)
 {
@@ -140,61 +195,24 @@ inline int pext(bitboard_t BB, bitboard_t mask)
 #endif
 }
 
-inline uint8_t bitCount(bitboard_t BB)
+inline index_t bitCount(bitboard_t BB)
 {
 #if __has_builtin(__builtin_popcountll)
-  return static_cast<uint8_t>(__builtin_popcountll(BB));
+  return static_cast<index_t>(__builtin_popcountll(BB));
 #else
   return 0; // Impl needed
 #endif
 }
 
-inline uint8_t bitScan(bitboard_t BB)
+inline index_t bitScan(bitboard_t BB)
 {
 #if __has_builtin(__builtin_ctzll)
-  return static_cast<uint8_t>(__builtin_ctzll(BB));
+  return static_cast<index_t>(__builtin_ctzll(BB));
 #else
   return 0; // Impl needed
 #endif
 }
 
-template <Piece p> inline bitboard_t pieces(const bitboard_t pieces[])
-{
-  return pieces[p] | pieces[BLACK + p];
-}
-
-template <bool white>
-inline uint8_t getPiece(const bitboard_t pieces[], const uint8_t sq)
-{
-  const bitboard_t fromBB = BB(sq);
-  constexpr uint8_t last = BLACK + BLACK * !white;
-  for (uint8_t i = BLACK * !white; i < last; ++i)
-  {
-    if (pieces[i] & fromBB)
-    {
-      return i;
-    }
-  }
-  return white ? King : King + 1;
-}
-
-template <bool whiteToMove, Direction D> bitboard_t shift(bitboard_t b)
-{
-  if constexpr (whiteToMove)
-  {
-    return D == UP        ? b >> 8
-           : D == DOWN    ? b << 8
-           : D == UP_LEFT ? (b >> 9) & ~FileH
-                          : (b >> 7) & ~FileA;
-  }
-  if constexpr (!whiteToMove)
-  {
-    return D == UP        ? b << 8
-           : D == DOWN    ? b >> 8
-           : D == UP_LEFT ? (b << 7) & ~FileH
-                          : (b << 9) & ~FileA;
-  }
-}
 // Squares infront of pawn
 template <bool white> inline bitboard_t forwardSquares(square_t sq)
 {
@@ -235,19 +253,16 @@ template <bool white, bool kingSide> bool isAttacked(bitboard_t attack)
   }
 }
 
-// Return possible ep capturers
-template <bool whiteToMove> inline bitboard_t EPpawns(const Position &pos)
+inline constexpr bool moreThanOne(const bitboard_t b) { return b & (b - 1); }
+
+inline constexpr bool isOnBoard(square_t square)
 {
-  if constexpr (whiteToMove)
-  {
-    return Rank4 & pos.pieceBoards[WHITE];
-  }
-  return Rank5 & pos.pieceBoards[BLACK];
+  return square >= SQ_A8 && square <= SQ_H1;
 }
 
-inline bool moreThanOne(bitboard_t b) { return b & (b - 1); }
+constexpr index_t fileOf(square_t square) { return square & 7U; }
 
-constexpr uint8_t castlingModifiers[64] = {
+constexpr std::uint8_t castlingModifiers[SQ_COUNT] = {
     0b0111, 0b1111, 0b1111, 0b1111, 0b0011, 0b1111, 0b1111, 0b1011,
     0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111,
     0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111, 0b1111,
@@ -310,3 +325,5 @@ constexpr bitboard_t adjacentFiles[8] = {files[0] | files[1],
                                          files[4] | files[5] | files[6],
                                          files[5] | files[6] | files[7],
                                          files[6] | files[7]};
+
+} // namespace BitboardUtil

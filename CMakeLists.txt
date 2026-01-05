@@ -12,7 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 
 
-set(RELEASE_FLAGS "-march=native -std=c++20 -O3 -DSHALLOW_SEARCH")
+set(RELEASE_FLAGS "-march=native -std=c++20 -stdlib=libc++ -O3 -DSHALLOW_SEARCH")
 set(DEBUG_FLAGS "-g -march=native -std=c++20 -DSHALLOW_SEARCH")
 set(BASE_FLAGS "-fomit-frame-pointer -pipe -pedantic -pedantic-errors -Werror \
     -Wall -Wextra -Wshadow -Wdeprecated -Wdiv-by-zero -Wfloat-equal \

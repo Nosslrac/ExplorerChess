@@ -1,6 +1,6 @@
 #pragma once
-#include "bitboardUtilV2.h"
-#include "moveGenV2.h"
+#include "bitboardUtil.h"
+#include "moveGen.h"
 #include "types.h"
 #include <cassert>
 #include <string>

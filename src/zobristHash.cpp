@@ -1,7 +1,7 @@
 #include "zobristHash.h"
 
 #include "random"
-
+/*
 void ZobristHash::initHash()
 {
   std::random_device os_seed;
@@ -74,3 +74,4 @@ bitboard_t ZobristHash::hashPosition(const Position &pos)
 
   return posHash;
 }
+*/
